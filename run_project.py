@@ -1,6 +1,7 @@
 """Build the local CX NPS dataset and dashboard from a CWP survey export."""
 
 import argparse
+import csv
 import json
 import subprocess
 import sys
@@ -92,7 +93,29 @@ def discover_input(root):
     return unique[0]
 
 
-def build_dataset(input_path):
+def load_manual_overrides(review_path):
+    if not review_path.exists():
+        return {}
+    overrides = {}
+    with review_path.open("r", encoding="utf-8-sig", newline="") as handle:
+        for row in csv.DictReader(handle):
+            key = (row.get("feedback_key") or "").strip()
+            category = (row.get("category") or "").strip()
+            if key and category in TAXONOMY:
+                overrides[key] = category
+    return overrides
+
+
+def write_review_csv(review_path, feedback_rows):
+    fields = ["feedback_key", "month", "segment", "nps_class", "score", "category_auto", "category", "feedback"]
+    with review_path.open("w", encoding="utf-8-sig", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows({field: row.get(field, "") for field in fields} for row in feedback_rows)
+
+
+def build_dataset(input_path, manual_overrides=None):
+    manual_overrides = manual_overrides or {}
     workbook = openpyxl.load_workbook(input_path, read_only=True, data_only=True)
     sheet = workbook[workbook.sheetnames[0]]
     iterator = sheet.iter_rows(values_only=True)
@@ -138,10 +161,12 @@ def build_dataset(input_path):
         records.append(record)
         comment = " | ".join(get(column) for column in COMMENT_COLUMNS if get(column))
         if comment:
-            category = categorize(comment, segment)
+            category_auto = categorize(comment, segment)
+            category = manual_overrides.get(unique_id, category_auto)
             feedback_rows.append({
-                "month": response_date[:7], "segment": segment, "nps_class": nps_class,
-                "category": category, "score": score, "feedback": comment,
+                "feedback_key": unique_id, "month": response_date[:7], "segment": segment,
+                "nps_class": nps_class, "category_auto": category_auto, "category": category,
+                "score": score, "feedback": comment,
                 "category_local": category, "category_ollama": None,
             })
     workbook.close()
@@ -195,11 +220,13 @@ def main():
     output_dir = args.output_dir if args.output_dir.is_absolute() else root / args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     data_path, dashboard_path = output_dir / "nps_data.json", output_dir / "cx_nps_dashboard.html"
-    data = build_dataset(input_path)
+    review_path = output_dir / "feedback_review.csv"
+    data = build_dataset(input_path, load_manual_overrides(review_path))
     data_path.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    write_review_csv(review_path, data["feedback_model"]["rows"])
     build_script = root / "work" / "build_dashboard_clean.mjs"
     subprocess.run([args.node, str(build_script), str(data_path), str(dashboard_path)], cwd=root, check=True)
-    print(json.dumps({"input": str(input_path), "raw_rows": data["raw_rows"], "valid_responses": len(data["records"]), "feedback_with_text": data["feedback_model"]["feedback_with_text"], "dashboard": str(dashboard_path), "data": str(data_path)}, ensure_ascii=False, indent=2))
+    print(json.dumps({"input": str(input_path), "raw_rows": data["raw_rows"], "valid_responses": len(data["records"]), "feedback_with_text": data["feedback_model"]["feedback_with_text"], "dashboard": str(dashboard_path), "data": str(data_path), "review": str(review_path)}, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
