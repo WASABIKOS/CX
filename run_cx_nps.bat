@@ -21,16 +21,40 @@ if not defined INPUT_NAME (
   exit /b 2
 )
 
-if exist "%ROOT%.venv\Scripts\python.exe" (
-  set "PYTHON=%ROOT%.venv\Scripts\python.exe"
-) else (
+set "PYTHON="
+if exist "%ROOT%.venv\Scripts\python.exe" set "PYTHON=%ROOT%.venv\Scripts\python.exe"
+if not defined PYTHON (
+  where py >nul 2>&1
+  if not errorlevel 1 (
+    echo Creando el entorno local de Python por primera vez...
+    py -3 -m venv "%ROOT%.venv"
+    if errorlevel 1 (
+      echo No pude crear el entorno Python.
+      pause
+      exit /b 3
+    )
+    set "PYTHON=%ROOT%.venv\Scripts\python.exe"
+  )
+)
+if not defined PYTHON (
   where python >nul 2>&1
   if errorlevel 1 (
-    echo No encontre Python. Instala Python o crea .venv en el proyecto.
+    echo No encontre Python. Instala Python 3 y vuelve a ejecutar este archivo.
     pause
     exit /b 3
   )
   set "PYTHON=python"
+)
+
+if not exist "%ROOT%.venv\.cx_nps_ready" (
+  echo Instalando dependencias del proyecto por primera vez...
+  "%PYTHON%" -m pip install -r "%ROOT%requirements.txt"
+  if errorlevel 1 (
+    echo No pude instalar las dependencias Python.
+    pause
+    exit /b 3
+  )
+  >"%ROOT%.venv\.cx_nps_ready" echo ready
 )
 
 where node >nul 2>&1
