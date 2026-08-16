@@ -5,6 +5,8 @@ El proyecto normaliza respuestas rNPS y pNPS, calcula NPS por segmento,
 clasifica comentarios en drivers CX y conserva el estado incremental de las
 clasificaciones.
 
+Para el uso diario en Windows, consulta [`OPERACION_DIARIA.md`](OPERACION_DIARIA.md).
+
 ## Componentes
 
 - `incremental_feedback_classifier.py`: ingesta incremental desde Excel,
