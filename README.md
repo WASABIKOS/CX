@@ -32,17 +32,31 @@ Instalar dependencias Python:
 python -m pip install -r requirements.txt
 ```
 
-Ejecutar la clasificación incremental proporcionando las rutas locales del
-export de Medallia y del modelo:
+Colocar el export de encuestas cuyo nombre empiece por `CWP` en la raíz del
+proyecto (o dentro de `input/`) y ejecutar:
 
 ```powershell
-python incremental_feedback_classifier.py `
-  --input "C:\ruta\al\export_medallia.xlsx" `
-  --local-model "C:\ruta\al\CAT_CX_MODEL.pkl" `
-  --db "outputs\feedback_classifications.sqlite"
+python run_project.py
 ```
 
-La clasificación con Ollama es opcional y se activa con `--ollama-limit`.
+El programa detecta el Excel, calcula las métricas, clasifica los comentarios
+con la taxonomía local y genera:
+
+- `outputs/cx_nps_dashboard.html`: dashboard actualizado.
+- `outputs/nps_data.json`: dataset local utilizado para construirlo.
+
+Para elegir explícitamente un archivo o una carpeta de salida:
+
+```powershell
+python run_project.py `
+  --input "C:\ruta\al\CWP_encuestas.xlsx" `
+  --output-dir "outputs"
+```
+
+`incremental_feedback_classifier.py` permanece disponible para el flujo
+incremental con un modelo joblib local. El flujo recomendado para una carpeta
+clonada es `run_project.py`, que no depende de rutas absolutas ni de un modelo
+externo.
 
 ## Estado del repositorio
 
