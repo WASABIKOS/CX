@@ -1,0 +1,9 @@
+import fs from 'node:fs/promises';
+const p='work/nps_data.json'; const data=JSON.parse(await fs.readFile(p,'utf8')); const rows=data.feedback_model.rows;
+const categories=['Bajas y cancelaciones','Compra, activación y portabilidad','Cuenta, titularidad y app','Facturación, pagos y crédito','Fallas de internet residencial','Fallas de servicio móvil','Mudanza, instalación y visita','Otros motivos y derivaciones','Planes y cambios de plan','Recargas y paquetes prepago','Roaming internacional','SIM y eSIM','Saldo y consumo','Sin motivo o abandono temprano','TV y control remoto'];
+const texts=[...new Set(rows.map(x=>x.feedback).filter(Boolean))].slice(0,24); const cache={};
+for(let i=0;i<texts.length;i++){
+ const prompt='Clasifica este comentario de telecomunicaciones en UNA categoría exacta de la lista. Responde solamente el nombre exacto, sin explicación. Lista: '+categories.join(' | ')+'. Comentario: '+texts[i].replace(/\s+/g,' ').slice(0,500);
+ const res=await fetch('http://127.0.0.1:11434/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'qwen2.5-coder:1.5b',prompt,stream:false,options:{temperature:0,num_predict:40}})}); const body=await res.json(); const answer=String(body.response||'').trim().replace(/^['"]|['"]$/g,''); cache[texts[i]]=categories.includes(answer)?answer:null; console.log(i+1,'/',texts.length,cache[texts[i]]||'INVALID');
+}
+rows.forEach(x=>{x.category_local=x.category_local||x.category;x.category_ollama=cache[x.feedback]||null}); data.feedback_model.ollama={model:'qwen2.5-coder:1.5b',mode:'muestra validada comentario por comentario',unique_comments_requested:texts.length,unique_comments_valid:Object.values(cache).filter(Boolean).length,classified_at:new Date().toISOString()}; await fs.writeFile(p,JSON.stringify(data),'utf8');

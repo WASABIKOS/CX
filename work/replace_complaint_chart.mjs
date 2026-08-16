@@ -1,0 +1,16 @@
+import fs from 'node:fs/promises';
+
+const path = 'work/build_dashboard_clean.mjs';
+let s = await fs.readFile(path, 'utf8');
+s = s.replace('<h2>Evolutivo mensual de % de quejas</h2>', '<h2>TOP 3 de quejas por mes</h2>');
+s = s.replace('¿Qué proporción del feedback proviene de detractores?', '¿Qué categorías concentran las quejas y qué porcentaje representan en cada mes?');
+const cssNeedle = '.bar-chart{height:300px;display:flex;align-items:flex-end;gap:10px;overflow-x:auto;padding:34px 8px 5px;border-bottom:1px solid var(--border)}';
+const cssInsert = cssNeedle + '.top3-chart{min-height:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(205px,1fr));align-items:start;gap:22px 18px;overflow:visible;padding:14px 8px 18px;border-bottom:1px solid var(--border)}.top3-month{min-width:0;width:100%}.top3-month-title{font-size:12px;font-weight:800;color:var(--text);margin:0 0 14px}.top3-row{display:grid;grid-template-columns:108px minmax(0,1fr) 43px;gap:8px;align-items:center;margin:15px 0}.top3-label{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.top3-track{height:13px;background:#302c29;border-radius:7px;overflow:hidden}.top3-fill{height:100%;border-radius:7px;min-width:2px}.top3-value{font-size:10px;font-weight:800;text-align:right;color:var(--text)}';
+if (!s.includes('.top3-chart{')) s = s.replace(cssNeedle, cssInsert);
+s = s.replace('<div class="bar-chart" id="complaintChart"></div>', '<div class="top3-chart" id="complaintChart"></div>');
+const old = "var feedbackMonths=[...new Set(feedback.map(function(x){return x.month}))].sort();var fby={};feedbackMonths.forEach(function(m){fby[m]=feedback.filter(function(x){return x.month===m})});renderBarChart($('complaintChart'),feedbackMonths,function(m){var a=fby[m];return a.length?a.filter(function(x){return x.klass==='Detractor'}).length/a.length*100:0},function(v){return v.toFixed(1)+'%'},function(){return 'red'});";
+const replacement = "var feedbackMonths=[...new Set(feedback.map(function(x){return x.month}))].sort();var top3Palette=['var(--red)','var(--orange)','var(--yellow)'];$('complaintChart').innerHTML=feedbackMonths.map(function(m){var rows=feedback.filter(function(x){return x.month===m&&x.category!=='Otros / no especificado'}),total=rows.length||1,counts={};rows.forEach(function(x){counts[x.category]=(counts[x.category]||0)+1});var top3=Object.entries(counts).sort(function(a,b){return b[1]-a[1]}).slice(0,3);return '<div class=\"top3-month\"><div class=\"top3-month-title\">'+monthLabel(m)+'</div>'+top3.map(function(x,i){var pct=x[1]/total*100;return '<div class=\"top3-row\" title=\"TOP '+(i+1)+' · '+x[0]+' · '+pct.toFixed(1)+'%\"><span class=\"top3-label\">TOP '+(i+1)+' · '+x[0]+'</span><div class=\"top3-track\"><div class=\"top3-fill\" style=\"width:'+Math.max(pct,2)+'%;background:'+top3Palette[i]+'\"></div></div><span class=\"top3-value\">'+pct.toFixed(1)+'%</span></div>';}).join('')+'</div>';}).join('')||'<div class=\"empty\">No hay categorías de quejas para esta selección.</div>';";
+if (!s.includes('top3-month-title')) throw new Error('No se encontró el bloque de categoría mensual');
+s = s.replace(old, replacement);
+await fs.writeFile(path, s, 'utf8');
+console.log('complaint chart replaced with top 3 by month');
