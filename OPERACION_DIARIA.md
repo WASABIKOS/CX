@@ -91,7 +91,8 @@ estas reglas:
 La vista SAMI presenta primero sus tarjetas de resumen, seguidas por NPS,
 Contención y Recontacto con barras verticales mensuales del total. Debajo
 compara los mismos indicadores por segmento: el eje X es el mes, el eje Y es
-el valor y cada color representa un segmento. Cada gráfico informa máximo,
+el valor y cada color representa un segmento. Los gráficos se muestran uno
+debajo del otro para usar el ancho completo. Cada gráfico informa máximo,
 mínimo y la tendencia mensual del total.
 
 El pipeline procesa el Excel progresivamente y guarda únicamente agregados.
