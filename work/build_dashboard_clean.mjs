@@ -29,6 +29,7 @@ const preferredSegmentOrder = [
   'tNPS - Install - Full Install',
   'tNPS - Install - Self Install',
   'tNPS - Change',
+  'tNPS - Exit',
   'tNPS - Help - CC',
   'tNPS - Help - Store',
   'tNPS - Help - General',

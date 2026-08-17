@@ -76,7 +76,7 @@ cambio y actualizar el HTML publicado.
 
 La segmentación del reporte separa pNPS en Internet, Mobile Contrato y Mobile
 Prepago. tNPS se desglosa por touchpoint: Pay (Invoice/Full Journey), Buy,
-Install (Full/Self), Change y Help (CC/Store/General/Technician).
+Install (Full/Self), Change, Exit y Help (CC/Store/Technician, resuelto por `tHelp - Type`).
 
 Para elegir explícitamente un archivo o una carpeta de salida:
 

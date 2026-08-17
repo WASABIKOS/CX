@@ -43,6 +43,7 @@ TNPS_SCORE_COLUMNS = [
     "Help Technician - Likelihood to Recommend",
     "Help Technician - Likelihood To Recommend",
     "Change - Likelihood to Recommend",
+    "Exit - Likeliness to Rejoin",
 ]
 TNPS_COMMENT_COLUMNS = [
     "Buy - Likelihood to Recommend Comment", "Buy - Catch All Comment", "Buy - Catchall Comment AB",
@@ -56,6 +57,10 @@ TNPS_COMMENT_COLUMNS = [
     "Help Technician - Likelihood To Recommend Comment", "Help Technician - Catch All Comment",
     "Help Technician - Catchall Comment AB", "Change - Likelihood to Recommend Comment",
     "Change - Catch All Comment",
+    "Exit - Likeliness to Rejoin Comment", "Exit - Cancellation Reason", "Exit - Company Switch",
+    "Exit - Reason to Stay", "Exit - Agent Understanding", "Exit - Agent Friendliness",
+    "Exit - Catch All Comment", "CWP Exit - Cancellation Reason", "CWP Exit - Cancellation Reason - Other",
+    "CWP Exit - Company Switch", "CWP Exit - Company Switch (Other)",
 ]
 COMMENT_COLUMNS = [*BASE_COMMENT_COLUMNS, *TNPS_COMMENT_COLUMNS]
 BASE_NEEDED_COLUMNS = [
@@ -64,13 +69,16 @@ BASE_NEEDED_COLUMNS = [
     "Internet - Likelihood to Recommend", "Mobile - Likelihood to Recommend",
     *BASE_COMMENT_COLUMNS, "NPS Segments - pNPS Internet", "NPS Segments - pNPS Mobile",
 ]
-OPTIONAL_TNPS_COLUMNS = ["tNPS Touchpoint", *TNPS_SCORE_COLUMNS, *TNPS_COMMENT_COLUMNS, "NPS Segments - rNPS/tNPS"]
+OPTIONAL_TNPS_COLUMNS = [
+    "tNPS Touchpoint", "tHelp - Type", "tExit - Type", *TNPS_SCORE_COLUMNS,
+    *TNPS_COMMENT_COLUMNS, "NPS Segments - rNPS/tNPS",
+]
 NEEDED_COLUMNS = [*BASE_NEEDED_COLUMNS, *OPTIONAL_TNPS_COLUMNS]
 SEGMENT_ORDER = [
     "pNPS Internet", "pNPS Mobile - Contrato", "pNPS Mobile - Prepago",
     "tNPS - Pay - Invoice", "tNPS - Pay - Full Journey", "tNPS - Buy",
     "tNPS - Install - Full Install", "tNPS - Install - Self Install",
-    "tNPS - Change", "tNPS - Help - CC", "tNPS - Help - Store",
+    "tNPS - Change", "tNPS - Exit", "tNPS - Help - CC", "tNPS - Help - Store",
     "tNPS - Help - General", "tNPS - Help - Technician", "rNPS / Relación",
 ]
 MAPPING = [
@@ -129,7 +137,7 @@ def first_tnps_score(get, candidates):
     return None
 
 
-def tnps_product_and_score(get, touchpoint):
+def tnps_product_and_score(get, touchpoint, help_type):
     value = normalized_label(touchpoint)
     if not value:
         return None
@@ -159,21 +167,24 @@ def tnps_product_and_score(get, touchpoint):
         return first_tnps_score(get, candidates)
     if "change" in value:
         return first_tnps_score(get, [("tNPS - Change", "Change - Likelihood to Recommend")])
+    if "exit" in value:
+        return first_tnps_score(get, [("tNPS - Exit", "Exit - Likeliness to Rejoin")])
     if "help" in value:
-        if "technician" in value or "tecnico" in value:
+        help_value = normalized_label(help_type)
+        if "technician" in value or "tecnico" in value or "technician" in help_value or "truckroll" in help_value:
             candidates = [
                 ("tNPS - Help - Technician", "Help Technician - Likelihood to Recommend"),
                 ("tNPS - Help - Technician", "Help Technician - Likelihood To Recommend"),
             ]
-        elif "store" in value or "tienda" in value:
+        elif "store" in help_value or "tienda" in help_value:
             candidates = [("tNPS - Help - Store", "Help - Store Likelihood to Recommend")]
-        elif "cc" in value or "call" in value:
+        elif "cc" in help_value or "call center" in help_value:
             candidates = [("tNPS - Help - CC", "Help - CC Likelihood to Recommend")]
         else:
             candidates = [
-                ("tNPS - Help - General", "Help - Likelihood to Recommend"),
                 ("tNPS - Help - CC", "Help - CC Likelihood to Recommend"),
                 ("tNPS - Help - Store", "Help - Store Likelihood to Recommend"),
+                ("tNPS - Help - General", "Help - Likelihood to Recommend"),
                 ("tNPS - Help - Technician", "Help Technician - Likelihood to Recommend"),
                 ("tNPS - Help - Technician", "Help Technician - Likelihood To Recommend"),
             ]
@@ -181,10 +192,10 @@ def tnps_product_and_score(get, touchpoint):
     return None
 
 
-def product_and_score(get, survey_type, plan_type, broadband, tnps_touchpoint):
+def product_and_score(get, survey_type, plan_type, broadband, tnps_touchpoint, help_type):
     survey = normalized_label(survey_type)
     if survey == "tnps":
-        tnps = tnps_product_and_score(get, tnps_touchpoint)
+        tnps = tnps_product_and_score(get, tnps_touchpoint, help_type)
         if tnps:
             return tnps
     plan = plan_type.lower()
@@ -300,7 +311,11 @@ def build_dataset(input_path, manual_overrides=None, classification_state=None):
             continue
         survey_type, plan_type, broadband = get("Survey Type"), get("Plan Type"), get("Broadband RGU")
         tnps_touchpoint = get("tNPS Touchpoint")
-        segment, score_raw, score_basis = product_and_score(get, survey_type, plan_type, broadband, tnps_touchpoint)
+        help_type = get("tHelp - Type")
+        exit_type = get("tExit - Type")
+        segment, score_raw, score_basis = product_and_score(
+            get, survey_type, plan_type, broadband, tnps_touchpoint, help_type,
+        )
         score = as_float(score_raw)
         if score is None or not 0 <= score <= 10:
             continue
@@ -317,7 +332,7 @@ def build_dataset(input_path, manual_overrides=None, classification_state=None):
             "NPS Segments - pNPS Internet": get("NPS Segments - pNPS Internet"),
             "NPS Segments - pNPS Mobile": get("NPS Segments - pNPS Mobile"),
             "NPS Segments - rNPS/tNPS": get("NPS Segments - rNPS/tNPS"),
-            "tNPS Touchpoint": tnps_touchpoint,
+            "tNPS Touchpoint": tnps_touchpoint, "tHelp - Type": help_type, "tExit - Type": exit_type,
             "Score": score, "Score Basis": score_basis, "Product Segment": segment,
             "NPS Class": nps_class, "Response Date": response_date,
         }
