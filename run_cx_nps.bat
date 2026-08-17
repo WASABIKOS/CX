@@ -5,10 +5,14 @@ chcp 65001 >nul
 set "ROOT=%~dp0"
 set "INPUT_DIR=%ROOT%input"
 set "OUTPUT_DIR=%ROOT%outputs"
+rem Copia estable que consumen los usuarios del reporte publicado.
+set "PUBLISHED_DIR=%OUTPUT_DIR%\medallia_cx_nps_2026-08-14"
+set "PUBLISHED_DASHBOARD=%PUBLISHED_DIR%\medallia_cx_nps_dashboard.html"
 set "INPUT_NAME="
 
 if not exist "%INPUT_DIR%" mkdir "%INPUT_DIR%"
 if not exist "%OUTPUT_DIR%" mkdir "%OUTPUT_DIR%"
+if not exist "%PUBLISHED_DIR%" mkdir "%PUBLISHED_DIR%"
 
 for /f "delims=" %%F in ('dir /b /a-d /o-d "%INPUT_DIR%\CWP*.xlsx" 2^>nul') do if not defined INPUT_NAME set "INPUT_NAME=%%F"
 
@@ -75,12 +79,21 @@ if errorlevel 1 (
   exit /b 5
 )
 
+copy /Y "%OUTPUT_DIR%\cx_nps_dashboard.html" "%PUBLISHED_DASHBOARD%" >nul
+if errorlevel 1 (
+  echo.
+  echo No pude actualizar el dashboard publicado.
+  pause
+  exit /b 6
+)
+
 echo.
 echo Proceso completado.
-echo Dashboard: %OUTPUT_DIR%\cx_nps_dashboard.html
+echo Dashboard de trabajo: %OUTPUT_DIR%\cx_nps_dashboard.html
+echo Dashboard publicado: %PUBLISHED_DASHBOARD%
 echo Comentarios para leer o recategorizar: %OUTPUT_DIR%\feedback_review.csv
 echo Dataset local: %OUTPUT_DIR%\nps_data.json
 echo Taxonomia editable: %ROOT%cx_taxonomy.py
 echo.
-start "" "%OUTPUT_DIR%\cx_nps_dashboard.html"
+start "" "%PUBLISHED_DASHBOARD%"
 pause
