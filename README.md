@@ -1,7 +1,7 @@
 # CX NPS Analytics
 
-Pipeline de análisis de experiencia de cliente para exportes de Medallia/CWP.
-El proyecto normaliza respuestas rNPS y pNPS, calcula NPS por segmento,
+Pipeline de análisis de experiencia de cliente para exportes de Medallia/CWP
+y conversaciones del bot SAMI. El proyecto normaliza respuestas rNPS y pNPS, calcula NPS por segmento,
 clasifica comentarios en drivers CX y conserva el estado incremental de las
 clasificaciones.
 
@@ -18,6 +18,7 @@ datos, categorías o dashboards. El repositorio conserva una copia portable en
   mediante Ollama.
 - `run_cx_nps.bat`: flujo diario de un solo clic en Windows.
 - `run_project.py`: entrada portable que construye el dataset y el dashboard.
+- `sami_analytics.py`: lectura progresiva y agregación privada del export SAMI.
 - `outputs/feedback_review.csv`: revisión local de comentarios y categorías.
 - `work/build_report.mjs`: genera el reporte Excel a partir del dataset
   normalizado local.
@@ -48,9 +49,11 @@ proyecto (o dentro de `input/`) y ejecutar:
 python run_project.py
 ```
 
-En Windows, la operación diaria recomendada es colocar el Excel en `input/` y
-hacer doble clic en `run_cx_nps.bat`. El archivo detecta el Excel más reciente,
-ejecuta todo el proceso y abre el dashboard al terminar.
+En Windows, la operación diaria recomendada es colocar el Excel CWP y,
+opcionalmente, un archivo `SAMI*.xlsx` o
+`Detalle de Análisis Conversaciones de IA*.xlsx` en `input/`, y hacer doble clic
+en `run_cx_nps.bat`. El archivo detecta los exportes más recientes, ejecuta todo
+el proceso y abre el dashboard al terminar.
 
 El programa detecta el Excel, calcula las métricas y clasifica los comentarios
 con la taxonomía local. La clasificación automática es incremental: reutiliza
@@ -78,11 +81,18 @@ La segmentación del reporte separa pNPS en Internet, Mobile Contrato y Mobile
 Prepago. tNPS se desglosa por touchpoint: Pay (Invoice/Full Journey), Buy,
 Install (Full/Self), Change, Exit y Help (CC/Store/Technician, resuelto por `tHelp - Type`).
 
+Cuando existe un export SAMI válido, la navegación añade `SAMI` inmediatamente
+debajo de `rNPS / Relación`. Esta vista muestra NPS, encuestas aceptadas,
+interacciones, clientes únicos, contención, derivación y recontacto por periodo
+y segmento. Solo se guardan agregados: teléfonos, cuentas, identificadores y
+comentarios SAMI no se incorporan al JSON ni al HTML.
+
 Para elegir explícitamente un archivo o una carpeta de salida:
 
 ```powershell
 python run_project.py `
   --input "C:\ruta\al\CWP_encuestas.xlsx" `
+  --sami-input "C:\ruta\al\SAMI_conversaciones.xlsx" `
   --output-dir "outputs"
 ```
 

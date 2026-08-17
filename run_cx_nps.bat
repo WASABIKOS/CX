@@ -9,12 +9,15 @@ rem Copia estable que consumen los usuarios del reporte publicado.
 set "PUBLISHED_DIR=%OUTPUT_DIR%\medallia_cx_nps_2026-08-14"
 set "PUBLISHED_DASHBOARD=%PUBLISHED_DIR%\medallia_cx_nps_dashboard.html"
 set "INPUT_NAME="
+set "SAMI_NAME="
 
 if not exist "%INPUT_DIR%" mkdir "%INPUT_DIR%"
 if not exist "%OUTPUT_DIR%" mkdir "%OUTPUT_DIR%"
 if not exist "%PUBLISHED_DIR%" mkdir "%PUBLISHED_DIR%"
 
 for /f "delims=" %%F in ('dir /b /a-d /o-d "%INPUT_DIR%\CWP*.xlsx" 2^>nul') do if not defined INPUT_NAME set "INPUT_NAME=%%F"
+for /f "delims=" %%F in ('dir /b /a-d /o-d "%INPUT_DIR%\SAMI*.xlsx" 2^>nul') do if not defined SAMI_NAME set "SAMI_NAME=%%F"
+for /f "delims=" %%F in ('dir /b /a-d /o-d "%INPUT_DIR%\Detalle de Análisis Conversaciones de IA*.xlsx" 2^>nul') do if not defined SAMI_NAME set "SAMI_NAME=%%F"
 
 if not defined INPUT_NAME (
   echo No encontre un archivo CWP*.xlsx en:
@@ -70,8 +73,14 @@ if errorlevel 1 (
 
 echo Procesando:
 echo   %INPUT_DIR%\%INPUT_NAME%
+if defined SAMI_NAME echo   SAMI: %INPUT_DIR%\%SAMI_NAME%
+if not defined SAMI_NAME echo   SAMI: no se encontro un Excel opcional en input
 echo.
-"%PYTHON%" "%ROOT%run_project.py" --input "%INPUT_DIR%\%INPUT_NAME%" --output-dir "%OUTPUT_DIR%"
+if defined SAMI_NAME (
+  "%PYTHON%" "%ROOT%run_project.py" --input "%INPUT_DIR%\%INPUT_NAME%" --sami-input "%INPUT_DIR%\%SAMI_NAME%" --output-dir "%OUTPUT_DIR%"
+) else (
+  "%PYTHON%" "%ROOT%run_project.py" --input "%INPUT_DIR%\%INPUT_NAME%" --output-dir "%OUTPUT_DIR%"
+)
 if errorlevel 1 (
   echo.
   echo El proceso termino con errores. Revisa el mensaje anterior.

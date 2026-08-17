@@ -13,6 +13,7 @@ from pathlib import Path
 import openpyxl
 
 from cx_taxonomy import TAXONOMY, TAXONOMY_VERSION, categorize
+from sami_analytics import build_sami_dataset, discover_sami_input
 
 
 SPANISH_MONTHS = (
@@ -420,6 +421,11 @@ def main():
     root = Path(__file__).resolve().parent
     parser = argparse.ArgumentParser(description="Genera el dashboard CX NPS desde un export CWP*.xlsx")
     parser.add_argument("--input", type=Path, help="Ruta al Excel CWP; si se omite, busca CWP*.xlsx en el proyecto")
+    parser.add_argument(
+        "--sami-input",
+        type=Path,
+        help="Ruta opcional al Excel SAMI; si se omite, busca SAMI*.xlsx en input",
+    )
     parser.add_argument("--output-dir", type=Path, default=root / "outputs", help="Carpeta local de resultados")
     parser.add_argument("--node", default="node", help="Ejecutable de Node.js")
     args = parser.parse_args()
@@ -433,12 +439,17 @@ def main():
     state_path = output_dir / "classification_state.json"
     state = load_classification_state(state_path)
     data = build_dataset(input_path, load_manual_overrides(review_path), state)
+    sami_input = args.sami_input.resolve() if args.sami_input else discover_sami_input(root)
+    if sami_input:
+        if not sami_input.exists():
+            raise FileNotFoundError(f"No existe el Excel SAMI: {sami_input}")
+        data["sami"] = build_sami_dataset(sami_input)
     data_path.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     write_review_csv(review_path, data["feedback_model"]["rows"])
     build_script = root / "work" / "build_dashboard_clean.mjs"
     subprocess.run([args.node, str(build_script), str(data_path), str(dashboard_path)], cwd=root, check=True)
     write_classification_state(state_path, data["feedback_model"]["rows"], state)
-    print(json.dumps({"input": str(input_path), "raw_rows": data["raw_rows"], "valid_responses": len(data["records"]), "feedback_with_text": data["feedback_model"]["feedback_with_text"], "classification_stats": data["feedback_model"]["classification_stats"], "dashboard": str(dashboard_path), "data": str(data_path), "review": str(review_path), "state": str(state_path)}, ensure_ascii=False, indent=2))
+    print(json.dumps({"input": str(input_path), "sami_input": str(sami_input) if sami_input else None, "raw_rows": data["raw_rows"], "valid_responses": len(data["records"]), "feedback_with_text": data["feedback_model"]["feedback_with_text"], "classification_stats": data["feedback_model"]["classification_stats"], "sami_rows": data.get("sami", {}).get("quality", {}).get("source_rows", 0), "dashboard": str(dashboard_path), "data": str(data_path), "review": str(review_path), "state": str(state_path)}, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

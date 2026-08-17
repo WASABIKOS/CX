@@ -6,8 +6,10 @@ el export de encuestas, ejecutar un archivo y revisar el dashboard actualizado.
 ## Ruta rápida
 
 1. Coloca el Excel cuyo nombre empieza por `CWP` en `input/`.
-2. Haz doble clic en [`run_cx_nps.bat`](run_cx_nps.bat).
-3. Abre `outputs/cx_nps_dashboard.html`; el archivo se abre automáticamente al terminar.
+2. Para actualizar SAMI, coloca también el export `SAMI*.xlsx` o
+   `Detalle de Análisis Conversaciones de IA*.xlsx` en `input/`.
+3. Haz doble clic en [`run_cx_nps.bat`](run_cx_nps.bat).
+4. Abre `outputs/cx_nps_dashboard.html`; el archivo se abre automáticamente al terminar.
 
 El `.bat` conserva el dashboard de trabajo y copia la versión lista para usuarios en
 `outputs/medallia_cx_nps_2026-08-14/medallia_cx_nps_dashboard.html`. Esa es la ruta
@@ -31,6 +33,7 @@ En el primer uso, `run_cx_nps.bat` crea `.venv` e instala las dependencias de
 | Ubicación | Uso |
 |---|---|
 | `input/CWP*.xlsx` | Export actual de encuestas Medallia/CWP. |
+| `input/SAMI*.xlsx` | Export opcional de conversaciones SAMI. También se acepta el nombre original `Detalle de Análisis Conversaciones de IA*.xlsx`. |
 | `outputs/cx_nps_dashboard.html` | Dashboard HTML actualizado y navegable. |
 | `outputs/medallia_cx_nps_2026-08-14/medallia_cx_nps_dashboard.html` | Copia publicada que consumen los usuarios. |
 | `outputs/feedback_review.csv` | Comentarios y categorías para revisión manual. |
@@ -69,6 +72,24 @@ La navegación del dashboard separa pNPS en Internet, Mobile Contrato y Mobile
 Prepago. tNPS se separa por touchpoint y subtipo: Pay (Invoice/Full Journey),
 Buy, Install (Full/Self), Change, Exit y Help (CC/Store/Technician, resuelto por `tHelp - Type`).
 
+## Indicadores SAMI
+
+Cuando el BAT encuentra un Excel SAMI, añade la sección `SAMI` debajo de
+`rNPS / Relación`. Se aplican estas reglas:
+
+- NPS: porcentaje de promotores menos porcentaje de detractores, usando solo
+  `ACEPTO ENCUESTA = ACEPTO` con `PUNTUACION` válida entre 0 y 10.
+- Contención: no derivados dividido entre registros con `DERIVADO` informado.
+- Derivación: derivados dividido entre registros con `DERIVADO` informado.
+- Clientes únicos: teléfonos distintos dentro del periodo seleccionado.
+- Recontacto: `(interacciones - clientes únicos) / interacciones`.
+- Los registros sin fecha se excluyen de tendencias y se informan en la nota de
+  calidad. Los meses incompletos se muestran como parciales.
+
+El pipeline procesa el Excel progresivamente y guarda únicamente agregados.
+No incorpora teléfonos, cuentas, identificadores ni comentarios SAMI al JSON o
+al dashboard.
+
 ## Si hay más de un Excel
 
 El `.bat` procesa automáticamente el archivo CWP con fecha de modificación más
@@ -77,6 +98,7 @@ reciente. Para elegir otro archivo de forma explícita:
 ```powershell
 python run_project.py `
   --input "input\CWP_encuestas_2026-08-15.xlsx" `
+  --sami-input "input\SAMI_conversaciones_2026-08-19.xlsx" `
   --output-dir "outputs"
 ```
 
