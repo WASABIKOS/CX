@@ -88,9 +88,11 @@ estas reglas:
 - Los registros sin fecha se excluyen de tendencias y se informan en la nota de
   calidad. Los meses incompletos se muestran como parciales.
 
-La vista SAMI presenta primero NPS, Contención y Recontacto con barras
-verticales mensuales del total. Debajo compara los mismos indicadores por
-segmento, con máximo, mínimo, promedio y tendencia frente al mes anterior.
+La vista SAMI presenta primero sus tarjetas de resumen, seguidas por NPS,
+Contención y Recontacto con barras verticales mensuales del total. Debajo
+compara los mismos indicadores por segmento: el eje X es el mes, el eje Y es
+el valor y cada color representa un segmento. Cada gráfico informa máximo,
+mínimo y la tendencia mensual del total.
 
 El pipeline procesa el Excel progresivamente y guarda únicamente agregados.
 No incorpora teléfonos, cuentas, identificadores ni comentarios SAMI al JSON o
