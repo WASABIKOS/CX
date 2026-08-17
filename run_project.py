@@ -26,20 +26,51 @@ def report_timestamp():
     return f"{now.day:02d} {SPANISH_MONTHS[now.month - 1]} {now.year} · {now:%H:%M}"
 
 
-COMMENT_COLUMNS = [
+BASE_COMMENT_COLUMNS = [
     "rNPS - Overall Satisfaction comment",
     "Internet Additional Comments",
     "Phone Mobile Catchall Comment",
 ]
-NEEDED_COLUMNS = [
+TNPS_SCORE_COLUMNS = [
+    "Buy - Likelihood to Recommend",
+    "Full Install - Likelihood to Recommend",
+    "Self Install - Likelihood to Recommend",
+    "Pay Invoice - Likelihood to Recommend",
+    "Pay Full Journey - Likelihood to Recommend",
+    "Help - CC Likelihood to Recommend",
+    "Help - Store Likelihood to Recommend",
+    "Help - Likelihood to Recommend",
+    "Help Technician - Likelihood To Recommend",
+    "Change - Likelihood to Recommend",
+]
+TNPS_COMMENT_COLUMNS = [
+    "Buy - Likelihood to Recommend Comment", "Buy - Catch All Comment", "Buy - Catchall Comment AB",
+    "Full Install - Likelihood to Recommend Comment", "Full Install - Problem Comment",
+    "Full Install - Catch All Comment", "Full Install - Catchall Comment AB",
+    "Self Install - Likelihood to Recommend Comment", "Self Install - Problem Comment",
+    "Self Install - Catch All Comment", "Self Install - Satisfaction Comment",
+    "Pay Invoice - Likelihood to Recommend Comment", "Pay Invoice - Catch All Comment",
+    "Pay Full Journey - Likelihood to Recommend Comment", "Pay Full Journey - Catch All Comment",
+    "Help - Likelihood to Recommend  Comment", "Help - Catch All Comment",
+    "Help Technician - Likelihood To Recommend Comment", "Help Technician - Catch All Comment",
+    "Help Technician - Catchall Comment AB", "Change - Likelihood to Recommend Comment",
+    "Change - Catch All Comment",
+]
+COMMENT_COLUMNS = [*BASE_COMMENT_COLUMNS, *TNPS_COMMENT_COLUMNS]
+BASE_NEEDED_COLUMNS = [
     "CW - Unique ID", "Unit", "Survey Type", "Plan Type", "Broadband RGU",
     "Customer Response Date (EST)", "Probabilidad de Recomendar",
     "Internet - Likelihood to Recommend", "Mobile - Likelihood to Recommend",
-    *COMMENT_COLUMNS, "NPS Segments - pNPS Internet", "NPS Segments - pNPS Mobile",
-    "NPS Segments - rNPS/tNPS",
+    *BASE_COMMENT_COLUMNS, "NPS Segments - pNPS Internet", "NPS Segments - pNPS Mobile",
 ]
+OPTIONAL_TNPS_COLUMNS = ["tNPS Touchpoint", *TNPS_SCORE_COLUMNS, *TNPS_COMMENT_COLUMNS, "NPS Segments - rNPS/tNPS"]
+NEEDED_COLUMNS = [*BASE_NEEDED_COLUMNS, *OPTIONAL_TNPS_COLUMNS]
 SEGMENT_ORDER = [
-    "pNPS Internet", "pNPS Mobile - Contrato", "pNPS Mobile - Prepago", "rNPS / Relación",
+    "pNPS Internet", "pNPS Mobile - Contrato", "pNPS Mobile - Prepago",
+    "tNPS - Pay - Invoice", "tNPS - Pay - Full Journey", "tNPS - Buy",
+    "tNPS - Install - Full Install", "tNPS - Install - Self Install",
+    "tNPS - Change", "tNPS - Help - CC", "tNPS - Help - Store",
+    "tNPS - Help - General", "tNPS - Help - Technician", "rNPS / Relación",
 ]
 MAPPING = [
     ["Fuente", "Campo / regla", "Uso en reporte"],
@@ -48,6 +79,11 @@ MAPPING = [
     ["pNPS Internet", "Survey Type = pNPS + Plan Type = Servicio residencial + Broadband RGU > 0 → Internet - Likelihood to Recommend", "Score 0–10 para pNPS Internet"],
     ["pNPS Mobile contrato", "Survey Type = pNPS + Plan Type contiene Contrato → Mobile - Likelihood to Recommend", "Score 0–10 para pNPS Mobile contrato"],
     ["pNPS Mobile prepago", "Survey Type = pNPS + Plan Type contiene Prepago → Mobile - Likelihood to Recommend", "Score 0–10 para pNPS Mobile prepago"],
+    ["tNPS Pay", "tNPS Touchpoint = Pay → Pay Invoice / Pay Full Journey - Likelihood to Recommend", "Score 0–10 por subtipo Pay"],
+    ["tNPS Buy", "tNPS Touchpoint = Buy → Buy - Likelihood to Recommend", "Score 0–10 para tNPS Buy"],
+    ["tNPS Install", "tNPS Touchpoint = Install → Full Install / Self Install - Likelihood to Recommend", "Score 0–10 por subtipo Install"],
+    ["tNPS Change", "tNPS Touchpoint = Change → Change - Likelihood to Recommend", "Score 0–10 para tNPS Change"],
+    ["tNPS Help", "tNPS Touchpoint = Help → CC / Store / General / Technician - Likelihood to Recommend", "Score 0–10 por subtipo Help"],
     ["Clasificación", "9–10 Promotor; 7–8 Neutro; 0–6 Detractor", "Base estándar NPS"],
     ["NPS", "(% Promotores - % Detractores) × 100", "Calculado por segmento y mes"],
 ]
@@ -80,7 +116,70 @@ def classify_score(score):
     return "Promotor" if score >= 9 else "Neutro" if score >= 7 else "Detractor"
 
 
-def product_and_score(get, survey_type, plan_type, broadband):
+def normalized_label(value):
+    return " ".join(str(value or "").lower().replace("-", " ").split())
+
+
+def first_tnps_score(get, candidates):
+    for segment, field in candidates:
+        score = get(field)
+        if as_float(score) is not None:
+            return segment, score, field
+    return None
+
+
+def tnps_product_and_score(get, touchpoint):
+    value = normalized_label(touchpoint)
+    if not value:
+        return None
+    if "pay" in value:
+        if "invoice" in value:
+            candidates = [("tNPS - Pay - Invoice", "Pay Invoice - Likelihood to Recommend")]
+        elif "full journey" in value or "journey" in value:
+            candidates = [("tNPS - Pay - Full Journey", "Pay Full Journey - Likelihood to Recommend")]
+        else:
+            candidates = [
+                ("tNPS - Pay - Invoice", "Pay Invoice - Likelihood to Recommend"),
+                ("tNPS - Pay - Full Journey", "Pay Full Journey - Likelihood to Recommend"),
+            ]
+        return first_tnps_score(get, candidates)
+    if "buy" in value:
+        return first_tnps_score(get, [("tNPS - Buy", "Buy - Likelihood to Recommend")])
+    if "install" in value:
+        if "self" in value:
+            candidates = [("tNPS - Install - Self Install", "Self Install - Likelihood to Recommend")]
+        elif "full" in value:
+            candidates = [("tNPS - Install - Full Install", "Full Install - Likelihood to Recommend")]
+        else:
+            candidates = [
+                ("tNPS - Install - Full Install", "Full Install - Likelihood to Recommend"),
+                ("tNPS - Install - Self Install", "Self Install - Likelihood to Recommend"),
+            ]
+        return first_tnps_score(get, candidates)
+    if "change" in value:
+        return first_tnps_score(get, [("tNPS - Change", "Change - Likelihood to Recommend")])
+    if "help" in value:
+        if "technician" in value or "tecnico" in value:
+            candidates = [("tNPS - Help - Technician", "Help Technician - Likelihood To Recommend")]
+        elif "store" in value or "tienda" in value:
+            candidates = [("tNPS - Help - Store", "Help - Store Likelihood to Recommend")]
+        elif "cc" in value or "call" in value:
+            candidates = [("tNPS - Help - CC", "Help - CC Likelihood to Recommend")]
+        else:
+            candidates = [
+                ("tNPS - Help - General", "Help - Likelihood to Recommend"),
+                ("tNPS - Help - CC", "Help - CC Likelihood to Recommend"),
+                ("tNPS - Help - Store", "Help - Store Likelihood to Recommend"),
+                ("tNPS - Help - Technician", "Help Technician - Likelihood To Recommend"),
+            ]
+        return first_tnps_score(get, candidates)
+    return None
+
+
+def product_and_score(get, survey_type, plan_type, broadband, tnps_touchpoint):
+    tnps = tnps_product_and_score(get, tnps_touchpoint)
+    if tnps:
+        return tnps
     survey = survey_type.lower()
     plan = plan_type.lower()
     if survey == "rnps":
@@ -177,7 +276,7 @@ def build_dataset(input_path, manual_overrides=None, classification_state=None):
     next(iterator, None)
     headers = list(next(iterator, ()))
     positions = {name: index for index, name in enumerate(headers) if name}
-    missing = [name for name in NEEDED_COLUMNS if name not in positions]
+    missing = [name for name in BASE_NEEDED_COLUMNS if name not in positions]
     if missing:
         raise ValueError(f"Columnas faltantes en el Excel: {missing}")
 
@@ -187,13 +286,15 @@ def build_dataset(input_path, manual_overrides=None, classification_state=None):
         raw_rows += 1
 
         def get(name):
-            return text(row[positions[name]])
+            position = positions.get(name)
+            return text(row[position]) if position is not None else ""
 
         unique_id = get("CW - Unique ID")
         if not unique_id:
             continue
         survey_type, plan_type, broadband = get("Survey Type"), get("Plan Type"), get("Broadband RGU")
-        segment, score_raw, score_basis = product_and_score(get, survey_type, plan_type, broadband)
+        tnps_touchpoint = get("tNPS Touchpoint")
+        segment, score_raw, score_basis = product_and_score(get, survey_type, plan_type, broadband, tnps_touchpoint)
         score = as_float(score_raw)
         if score is None or not 0 <= score <= 10:
             continue
@@ -210,6 +311,7 @@ def build_dataset(input_path, manual_overrides=None, classification_state=None):
             "NPS Segments - pNPS Internet": get("NPS Segments - pNPS Internet"),
             "NPS Segments - pNPS Mobile": get("NPS Segments - pNPS Mobile"),
             "NPS Segments - rNPS/tNPS": get("NPS Segments - rNPS/tNPS"),
+            "tNPS Touchpoint": tnps_touchpoint,
             "Score": score, "Score Basis": score_basis, "Product Segment": segment,
             "NPS Class": nps_class, "Response Date": response_date,
         }

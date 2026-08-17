@@ -15,6 +15,7 @@ Activa este skill cuando trabajes con el Excel `CWP*.xlsx`, categorías CX,
 ## Hard Rules
 
 - Usa `CW - Unique ID` como `feedback_key`; nunca lo cambies.
+- Trata tNPS como segmentos de touchpoint: Pay (Invoice/Full Journey), Buy, Install (Full/Self), Change y Help (CC/Store/General/Technician).
 - Para una recategorización manual o hecha por otro LLM, edita únicamente `category` en `outputs/feedback_review.csv`.
 - Usa exactamente una categoría de `cx_taxonomy.py`; no inventes etiquetas.
 - No edites el HTML generado ni `category_auto` directamente.

@@ -65,6 +65,10 @@ que ya tienen el mismo `feedback_key`, el mismo texto y la misma versión de la
 taxonomía. Si el comentario cambia, si aparece uno nuevo o si cambia la
 taxonomía, se recalcula automáticamente.
 
+La navegación del dashboard separa pNPS en Internet, Mobile Contrato y Mobile
+Prepago. tNPS se separa por touchpoint y subtipo: Pay (Invoice/Full Journey),
+Buy, Install (Full/Self), Change y Help (CC/Store/General/Technician).
+
 ## Si hay más de un Excel
 
 El `.bat` procesa automáticamente el archivo CWP con fecha de modificación más
