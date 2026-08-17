@@ -9,6 +9,10 @@ el export de encuestas, ejecutar un archivo y revisar el dashboard actualizado.
 2. Haz doble clic en [`run_cx_nps.bat`](run_cx_nps.bat).
 3. Abre `outputs/cx_nps_dashboard.html`; el archivo se abre automáticamente al terminar.
 
+El `.bat` conserva el dashboard de trabajo y copia la versión lista para usuarios en
+`outputs/medallia_cx_nps_2026-08-14/medallia_cx_nps_dashboard.html`. Esa es la ruta
+publicada que debe revisarse o refrescarse después de cada actualización.
+
 El `.bat` toma el Excel CWP más reciente de `input/`. No es necesario abrir
 Python, Node.js ni los scripts internos durante la operación diaria.
 
@@ -28,6 +32,7 @@ En el primer uso, `run_cx_nps.bat` crea `.venv` e instala las dependencias de
 |---|---|
 | `input/CWP*.xlsx` | Export actual de encuestas Medallia/CWP. |
 | `outputs/cx_nps_dashboard.html` | Dashboard HTML actualizado y navegable. |
+| `outputs/medallia_cx_nps_2026-08-14/medallia_cx_nps_dashboard.html` | Copia publicada que consumen los usuarios. |
 | `outputs/feedback_review.csv` | Comentarios y categorías para revisión manual. |
 | `outputs/nps_data.json` | Dataset local usado para construir el dashboard. |
 | `cx_taxonomy.py` | Categorías válidas y reglas de clasificación local. |
