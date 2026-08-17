@@ -92,6 +92,7 @@ echo Proceso completado.
 echo Dashboard de trabajo: %OUTPUT_DIR%\cx_nps_dashboard.html
 echo Dashboard publicado: %PUBLISHED_DASHBOARD%
 echo Comentarios para leer o recategorizar: %OUTPUT_DIR%\feedback_review.csv
+echo Estado incremental de categorias: %OUTPUT_DIR%\classification_state.json
 echo Dataset local: %OUTPUT_DIR%\nps_data.json
 echo Taxonomia editable: %ROOT%cx_taxonomy.py
 echo.

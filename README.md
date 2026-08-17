@@ -48,18 +48,27 @@ En Windows, la operación diaria recomendada es colocar el Excel en `input/` y
 hacer doble clic en `run_cx_nps.bat`. El archivo detecta el Excel más reciente,
 ejecuta todo el proceso y abre el dashboard al terminar.
 
-El programa detecta el Excel, calcula las métricas, clasifica los comentarios
-con la taxonomía local y genera:
+El programa detecta el Excel, calcula las métricas y clasifica los comentarios
+con la taxonomía local. La clasificación automática es incremental: reutiliza
+el resultado cuando coinciden el `CW - Unique ID`, el texto del comentario y
+la versión de la taxonomía. Genera:
 
 - `outputs/cx_nps_dashboard.html`: dashboard actualizado.
 - `outputs/nps_data.json`: dataset local utilizado para construirlo.
 - `outputs/feedback_review.csv`: comentarios en formato editable para revisión
   o recategorización manual.
+- `outputs/classification_state.json`: estado local que evita recalcular
+  comentarios sin cambios.
 
 Para recategorizar un comentario, abre `outputs/feedback_review.csv` en Excel,
 edita la columna `category` usando una categoría exacta de `cx_taxonomy.py`,
 guarda el archivo y vuelve a ejecutar `run_cx_nps.bat`. La corrección se
 conservará en el dashboard mientras coincida el `feedback_key`.
+
+También puedes pedirle a tu LLM que edite directamente `category` en
+`outputs/feedback_review.csv`, manteniendo `feedback_key` y usando una categoría
+exacta de `cx_taxonomy.py`. Ejecuta después `run_cx_nps.bat` para aplicar el
+cambio y actualizar el HTML publicado.
 
 Para elegir explícitamente un archivo o una carpeta de salida:
 
@@ -69,10 +78,10 @@ python run_project.py `
   --output-dir "outputs"
 ```
 
-`incremental_feedback_classifier.py` permanece disponible para el flujo
-incremental con un modelo joblib local. El flujo recomendado para una carpeta
-clonada es `run_project.py`, que no depende de rutas absolutas ni de un modelo
-externo.
+`incremental_feedback_classifier.py` permanece disponible como flujo separado
+para experimentar con un modelo joblib local. El flujo recomendado para una
+carpeta clonada es `run_project.py`, que usa la taxonomía vigente, conserva el
+estado incremental y no depende de rutas absolutas ni de un modelo externo.
 
 ## Estado del repositorio
 

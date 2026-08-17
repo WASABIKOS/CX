@@ -2,6 +2,7 @@
 
 import argparse
 import csv
+import hashlib
 import json
 import subprocess
 import sys
@@ -11,7 +12,7 @@ from pathlib import Path
 
 import openpyxl
 
-from cx_taxonomy import TAXONOMY, categorize
+from cx_taxonomy import TAXONOMY, TAXONOMY_VERSION, categorize
 
 
 SPANISH_MONTHS = (
@@ -104,6 +105,40 @@ def discover_input(root):
     return unique[0]
 
 
+def comment_hash(comment):
+    return hashlib.sha256(comment.encode("utf-8")).hexdigest()
+
+
+def load_classification_state(state_path):
+    if not state_path.exists():
+        return {}
+    try:
+        payload = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if payload.get("version") != TAXONOMY_VERSION:
+        return {}
+    records = payload.get("records", {})
+    return records if isinstance(records, dict) else {}
+
+
+def write_classification_state(state_path, feedback_rows, previous_state=None):
+    records = dict(previous_state or {})
+    timestamp = datetime.now().isoformat(timespec="seconds")
+    for row in feedback_rows:
+        records[row["feedback_key"]] = {
+            "comment_hash": row["comment_hash"],
+            "category_auto": row["category_auto"],
+            "category": row["category"],
+            "category_source": row["category_source"],
+            "updated_at": timestamp,
+        }
+    state_path.write_text(
+        json.dumps({"version": TAXONOMY_VERSION, "records": records}, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
+
+
 def load_manual_overrides(review_path):
     if not review_path.exists():
         return {}
@@ -113,20 +148,28 @@ def load_manual_overrides(review_path):
             key = (row.get("feedback_key") or "").strip()
             category = (row.get("category") or "").strip()
             if key and category in TAXONOMY:
-                overrides[key] = category
+                source = (row.get("category_source") or "").strip()
+                legacy_manual = category != (row.get("category_auto") or "").strip()
+                explicit_source = source if source not in ("", "auto") else ""
+                if explicit_source or legacy_manual:
+                    overrides[key] = {"category": category, "source": explicit_source or "manual"}
     return overrides
 
 
 def write_review_csv(review_path, feedback_rows):
-    fields = ["feedback_key", "month", "segment", "nps_class", "score", "category_auto", "category", "feedback"]
+    fields = [
+        "feedback_key", "month", "segment", "nps_class", "score", "category_auto",
+        "category", "category_source", "feedback",
+    ]
     with review_path.open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
         writer.writerows({field: row.get(field, "") for field in fields} for row in feedback_rows)
 
 
-def build_dataset(input_path, manual_overrides=None):
+def build_dataset(input_path, manual_overrides=None, classification_state=None):
     manual_overrides = manual_overrides or {}
+    classification_state = classification_state or {}
     workbook = openpyxl.load_workbook(input_path, read_only=True, data_only=True)
     sheet = workbook[workbook.sheetnames[0]]
     iterator = sheet.iter_rows(values_only=True)
@@ -139,6 +182,7 @@ def build_dataset(input_path, manual_overrides=None):
         raise ValueError(f"Columnas faltantes en el Excel: {missing}")
 
     records, feedback_rows, raw_rows = [], [], 0
+    auto_reused = auto_recalculated = manual_applied = cached_manual_reused = 0
     for row in iterator:
         raw_rows += 1
 
@@ -172,11 +216,35 @@ def build_dataset(input_path, manual_overrides=None):
         records.append(record)
         comment = " | ".join(get(column) for column in COMMENT_COLUMNS if get(column))
         if comment:
-            category_auto = categorize(comment, segment)
-            category = manual_overrides.get(unique_id, category_auto)
+            current_hash = comment_hash(comment)
+            cached = classification_state.get(unique_id, {})
+            cache_valid = (
+                cached.get("comment_hash") == current_hash
+                and cached.get("category_auto") in TAXONOMY
+            )
+            if cache_valid:
+                category_auto = cached["category_auto"]
+                auto_reused += 1
+            else:
+                category_auto = categorize(comment, segment)
+                auto_recalculated += 1
+
+            override = manual_overrides.get(unique_id)
+            if override:
+                category = override["category"]
+                category_source = override["source"]
+                manual_applied += 1
+            elif cache_valid and cached.get("category_source") not in (None, "", "auto") and cached.get("category") in TAXONOMY:
+                category = cached["category"]
+                category_source = cached["category_source"]
+                cached_manual_reused += 1
+            else:
+                category = category_auto
+                category_source = "auto"
             feedback_rows.append({
                 "feedback_key": unique_id, "month": response_date[:7], "segment": segment,
                 "nps_class": nps_class, "category_auto": category_auto, "category": category,
+                "category_source": category_source, "comment_hash": current_hash,
                 "score": score, "feedback": comment,
                 "category_local": category, "category_ollama": None,
             })
@@ -211,10 +279,16 @@ def build_dataset(input_path, manual_overrides=None):
         "source_file": str(input_path), "raw_rows": raw_rows,
         "report_updated_at": report_timestamp(),
         "feedback_model": {
-            "model": "cx_drivers_v1_manual", "feedback_with_text": len(feedback_rows),
+            "model": "cx_drivers_v1_incremental_rules", "feedback_with_text": len(feedback_rows),
             "categories": categories, "rows": feedback_rows, "ollama": None,
-            "taxonomy": TAXONOMY, "classifier": "cx_drivers_v1_manual",
-            "classification_note": "Taxonomía CX determinística y reproducible; no requiere Ollama ni un modelo externo.",
+            "taxonomy": TAXONOMY, "classifier": TAXONOMY_VERSION,
+            "classification_note": "Clasificación local incremental: reutiliza comentarios sin cambios y conserva recategorizaciones editadas en feedback_review.csv.",
+            "classification_stats": {
+                "auto_reused": auto_reused,
+                "auto_recalculated": auto_recalculated,
+                "manual_or_external_applied": manual_applied,
+                "cached_manual_or_external_reused": cached_manual_reused,
+            },
         },
     }
 
@@ -233,12 +307,15 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
     data_path, dashboard_path = output_dir / "nps_data.json", output_dir / "cx_nps_dashboard.html"
     review_path = output_dir / "feedback_review.csv"
-    data = build_dataset(input_path, load_manual_overrides(review_path))
+    state_path = output_dir / "classification_state.json"
+    state = load_classification_state(state_path)
+    data = build_dataset(input_path, load_manual_overrides(review_path), state)
     data_path.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     write_review_csv(review_path, data["feedback_model"]["rows"])
     build_script = root / "work" / "build_dashboard_clean.mjs"
     subprocess.run([args.node, str(build_script), str(data_path), str(dashboard_path)], cwd=root, check=True)
-    print(json.dumps({"input": str(input_path), "raw_rows": data["raw_rows"], "valid_responses": len(data["records"]), "feedback_with_text": data["feedback_model"]["feedback_with_text"], "dashboard": str(dashboard_path), "data": str(data_path), "review": str(review_path)}, ensure_ascii=False, indent=2))
+    write_classification_state(state_path, data["feedback_model"]["rows"], state)
+    print(json.dumps({"input": str(input_path), "raw_rows": data["raw_rows"], "valid_responses": len(data["records"]), "feedback_with_text": data["feedback_model"]["feedback_with_text"], "classification_stats": data["feedback_model"]["classification_stats"], "dashboard": str(dashboard_path), "data": str(data_path), "review": str(review_path), "state": str(state_path)}, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

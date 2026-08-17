@@ -34,6 +34,7 @@ En el primer uso, `run_cx_nps.bat` crea `.venv` e instala las dependencias de
 | `outputs/cx_nps_dashboard.html` | Dashboard HTML actualizado y navegable. |
 | `outputs/medallia_cx_nps_2026-08-14/medallia_cx_nps_dashboard.html` | Copia publicada que consumen los usuarios. |
 | `outputs/feedback_review.csv` | Comentarios y categorías para revisión manual. |
+| `outputs/classification_state.json` | Estado incremental por `feedback_key` y hash del comentario. |
 | `outputs/nps_data.json` | Dataset local usado para construir el dashboard. |
 | `cx_taxonomy.py` | Categorías válidas y reglas de clasificación local. |
 
@@ -52,6 +53,17 @@ Los archivos de `input/` y `outputs/` son locales y están excluidos de GitHub.
 El proceso conserva la categoría manual usando `feedback_key`. Los comentarios
 nuevos se clasifican automáticamente y las correcciones existentes se vuelven
 a aplicar cuando el mismo feedback siga presente.
+
+El archivo `feedback_review.csv` también puede ser editado por un LLM local o
+por otra herramienta automatizada. Debe modificar únicamente `category`, usar
+una categoría exacta de `cx_taxonomy.py` y conservar `feedback_key`. Después se
+ejecuta `run_cx_nps.bat`; el cambio queda guardado y se refleja en el HTML de
+trabajo y en la copia publicada para usuarios.
+
+El proceso no vuelve a ejecutar la clasificación automática para comentarios
+que ya tienen el mismo `feedback_key`, el mismo texto y la misma versión de la
+taxonomía. Si el comentario cambia, si aparece uno nuevo o si cambia la
+taxonomía, se recalcula automáticamente.
 
 ## Si hay más de un Excel
 

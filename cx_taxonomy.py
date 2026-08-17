@@ -22,6 +22,10 @@ TAXONOMY = [
     "Otros / no especificado",
 ]
 
+# Increment this when the taxonomy or its rules change so cached automatic
+# classifications are intentionally recalculated.
+TAXONOMY_VERSION = "cx_drivers_v1_rules"
+
 
 def normalize(text):
     value = str(text or "").lower()
