@@ -40,6 +40,7 @@ TNPS_SCORE_COLUMNS = [
     "Help - CC Likelihood to Recommend",
     "Help - Store Likelihood to Recommend",
     "Help - Likelihood to Recommend",
+    "Help Technician - Likelihood to Recommend",
     "Help Technician - Likelihood To Recommend",
     "Change - Likelihood to Recommend",
 ]
@@ -160,7 +161,10 @@ def tnps_product_and_score(get, touchpoint):
         return first_tnps_score(get, [("tNPS - Change", "Change - Likelihood to Recommend")])
     if "help" in value:
         if "technician" in value or "tecnico" in value:
-            candidates = [("tNPS - Help - Technician", "Help Technician - Likelihood To Recommend")]
+            candidates = [
+                ("tNPS - Help - Technician", "Help Technician - Likelihood to Recommend"),
+                ("tNPS - Help - Technician", "Help Technician - Likelihood To Recommend"),
+            ]
         elif "store" in value or "tienda" in value:
             candidates = [("tNPS - Help - Store", "Help - Store Likelihood to Recommend")]
         elif "cc" in value or "call" in value:
@@ -170,6 +174,7 @@ def tnps_product_and_score(get, touchpoint):
                 ("tNPS - Help - General", "Help - Likelihood to Recommend"),
                 ("tNPS - Help - CC", "Help - CC Likelihood to Recommend"),
                 ("tNPS - Help - Store", "Help - Store Likelihood to Recommend"),
+                ("tNPS - Help - Technician", "Help Technician - Likelihood to Recommend"),
                 ("tNPS - Help - Technician", "Help Technician - Likelihood To Recommend"),
             ]
         return first_tnps_score(get, candidates)
