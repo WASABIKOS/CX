@@ -182,10 +182,11 @@ def tnps_product_and_score(get, touchpoint):
 
 
 def product_and_score(get, survey_type, plan_type, broadband, tnps_touchpoint):
-    tnps = tnps_product_and_score(get, tnps_touchpoint)
-    if tnps:
-        return tnps
-    survey = survey_type.lower()
+    survey = normalized_label(survey_type)
+    if survey == "tnps":
+        tnps = tnps_product_and_score(get, tnps_touchpoint)
+        if tnps:
+            return tnps
     plan = plan_type.lower()
     if survey == "rnps":
         return "rNPS / Relación", get("Probabilidad de Recomendar"), "Probabilidad de Recomendar"
