@@ -74,8 +74,10 @@ Buy, Install (Full/Self), Change, Exit y Help (CC/Store/Technician, resuelto por
 
 ## Indicadores SAMI
 
-Cuando el BAT encuentra un Excel SAMI, añade la sección `SAMI` debajo de
-`rNPS / Relación`. Se aplican estas reglas:
+Cuando el BAT encuentra un Excel SAMI, añade `SAMI` debajo de
+`rNPS / Relación`. Mientras se termina de construir la sección, aparece un
+aviso cerrable: `En proceso — Estamos construyendo algo por aquí`. Se aplican
+estas reglas:
 
 - NPS: porcentaje de promotores menos porcentaje de detractores, usando solo
   `ACEPTO ENCUESTA = ACEPTO` con `PUNTUACION` válida entre 0 y 10.

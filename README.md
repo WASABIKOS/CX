@@ -82,7 +82,9 @@ Prepago. tNPS se desglosa por touchpoint: Pay (Invoice/Full Journey), Buy,
 Install (Full/Self), Change, Exit y Help (CC/Store/Technician, resuelto por `tHelp - Type`).
 
 Cuando existe un export SAMI válido, la navegación añade `SAMI` inmediatamente
-debajo de `rNPS / Relación`. Esta vista muestra NPS, encuestas aceptadas,
+debajo de `rNPS / Relación`. Mientras se construye la sección, la vista muestra
+un aviso cerrable: `En proceso — Estamos construyendo algo por aquí`. La vista
+prepara NPS, encuestas aceptadas,
 interacciones, clientes únicos, contención, derivación y recontacto por periodo
 y segmento. Solo se guardan agregados: teléfonos, cuentas, identificadores y
 comentarios SAMI no se incorporan al JSON ni al HTML.
