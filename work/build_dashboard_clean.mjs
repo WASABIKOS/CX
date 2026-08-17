@@ -97,5 +97,9 @@ const withFinalCards = withYearFilter.replace(
   /<section class="comments-layout">[\s\S]*?<\/section>/,
   `<section class="comments-layout"><article class="panel search-card"><div class="panel-head"><div><h2>Buscar comentarios</h2><div class="panel-question">Filtra por palabra o frase dentro de la selección actual</div></div></div><input id="commentSearch" class="search-input" type="search" placeholder="Ejemplo: precio" autocomplete="off"><div id="searchCount" class="search-count">Escribe una palabra para comenzar.</div><div id="searchResults" class="search-results"><div class="empty">Sin búsqueda activa.</div></div></article><article class="panel"><div class="panel-head"><div><h2>Comentarios representativos</h2><div class="panel-question">Muestra diversa de la selección actual</div></div></div><div class="comments" id="comments"></div></article><article class="panel"><div class="panel-head"><div><h2>Cobertura de categorización</h2><div class="panel-question">¿Cuántos feedbacks tienen categoría y cuántos siguen pendientes?</div></div></div><div class="coverage-track"><div class="coverage-ok" id="coverageOk"></div><div class="coverage-pending" id="coveragePending"></div></div><div class="coverage-grid"><div class="coverage-stat"><span class="klabel">Categorizados</span><b class="positive" id="coverageClassified"></b><span class="ksub" id="coverageClassifiedPct"></span></div><div class="coverage-stat"><span class="klabel">No categorizados / pendientes</span><b class="negative" id="coverageUnclassified"></b><span class="ksub" id="coverageUnclassifiedPct"></span></div></div><div class="footer-note" id="coverageNote"></div></article></section>`,
 );
-await fs.writeFile(output, withFinalCards, 'utf8');
-console.log(output, withFinalCards.length);
+const withTnpsGuard = withFinalCards.replace(
+  '</body>',
+  `<script>(function(){var baseRender=render;function guardTnpsPanels(){var isTnps=String(activeSegment||'').indexOf('tNPS -')===0;var targets=document.getElementById('targetCards'),forecast=document.querySelector('.forecast-panel');if(targets)targets.style.display=isTnps?'none':'';if(forecast)forecast.style.display=isTnps?'none':''}render=function(){baseRender();guardTnpsPanels()};guardTnpsPanels()})();</script></body>`,
+);
+await fs.writeFile(output, withTnpsGuard, 'utf8');
+console.log(output, withTnpsGuard.length);

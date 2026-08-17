@@ -74,6 +74,10 @@ También puedes pedirle a tu LLM que edite directamente `category` en
 exacta de `cx_taxonomy.py`. Ejecuta después `run_cx_nps.bat` para aplicar el
 cambio y actualizar el HTML publicado.
 
+La segmentación del reporte separa pNPS en Internet, Mobile Contrato y Mobile
+Prepago. tNPS se desglosa por touchpoint: Pay (Invoice/Full Journey), Buy,
+Install (Full/Self), Change y Help (CC/Store/General/Technician).
+
 Para elegir explícitamente un archivo o una carpeta de salida:
 
 ```powershell
