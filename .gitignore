@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local source exports and generated reports
+outputs/
+*.xlsx
+*.xls
+*.csv
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.joblib
+*.pkl
+
+# Generated dashboard data and local classification caches
+work/nps_data.json
+work/ollama_classification_cache.json
+work/*.log
+work/*.ndjson
+work/*.png
+work/*.exe
+work/chrome-*/
+work/*-shot/
+work/*-check/
+
+# Generated JavaScript bundles that embed customer feedback
+work/dashboard_script.js
+work/check0.js
+work/check1.js
+work/clean_dashboard_script.js
+work/coverage_script.js
+work/toggle_script.js
+
+# Local tooling
+.DS_Store
+Thumbs.db
