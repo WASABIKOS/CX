@@ -6,6 +6,9 @@ clasifica comentarios en drivers CX y conserva el estado incremental de las
 clasificaciones.
 
 Para el uso diario en Windows, consulta [`OPERACION_DIARIA.md`](OPERACION_DIARIA.md).
+Para que un LLM siga las mismas reglas, carga
+[`skills/cx-nps-operacion/SKILL.md`](skills/cx-nps-operacion/SKILL.md) antes de
+editar datos, categorías o dashboards.
 
 ## Componentes
 
