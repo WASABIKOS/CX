@@ -14,6 +14,17 @@ import openpyxl
 from cx_taxonomy import TAXONOMY, categorize
 
 
+SPANISH_MONTHS = (
+    "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+    "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
+)
+
+
+def report_timestamp():
+    now = datetime.now()
+    return f"{now.day:02d} {SPANISH_MONTHS[now.month - 1]} {now.year} · {now:%H:%M}"
+
+
 COMMENT_COLUMNS = [
     "rNPS - Overall Satisfaction comment",
     "Internet Additional Comments",
@@ -198,6 +209,7 @@ def build_dataset(input_path, manual_overrides=None):
         "headers": headers, "needed": NEEDED_COLUMNS, "records": records, "summary": summary,
         "monthly": monthly, "sample": records[:10], "mapping": MAPPING,
         "source_file": str(input_path), "raw_rows": raw_rows,
+        "report_updated_at": report_timestamp(),
         "feedback_model": {
             "model": "cx_drivers_v1_manual", "feedback_with_text": len(feedback_rows),
             "categories": categories, "rows": feedback_rows, "ollama": None,

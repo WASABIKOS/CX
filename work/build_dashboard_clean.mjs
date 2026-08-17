@@ -4,6 +4,9 @@ import path from 'node:path';
 const sourcePath = process.argv[2] || 'work/nps_data.json';
 const output = process.argv[3] || 'outputs/medallia_cx_nps_2026-08-14/medallia_cx_nps_dashboard.html';
 const source = JSON.parse(await fs.readFile(sourcePath, 'utf8'));
+const spanishMonths = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const formatReportTimestamp = (date) => `${String(date.getDate()).padStart(2, '0')} ${spanishMonths[date.getMonth()]} ${date.getFullYear()} · ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+const reportUpdatedAt = source.report_updated_at || formatReportTimestamp(new Date());
 const feedbackRows = source.feedback_model.rows.map(x => ({
   month: x.month, segment: x.segment, klass: x.nps_class,
   category: x.category_local || x.category,
@@ -50,5 +53,9 @@ render();
 </script></body></html>`;
 
 await fs.mkdir(path.dirname(output), { recursive: true });
-await fs.writeFile(output, html, 'utf8');
-console.log(output, html.length);
+const renderedHtml = html.replace(
+  /(<div class="report-update-card">[\s\S]*?<strong>)(.*?)(<\/strong><\/div>)/,
+  `$1${reportUpdatedAt}$3`,
+);
+await fs.writeFile(output, renderedHtml, 'utf8');
+console.log(output, renderedHtml.length);
