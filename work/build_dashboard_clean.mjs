@@ -16,6 +16,7 @@ const feedbackRows = source.feedback_model.rows.map(x => ({
 }));
 const responseRows = source.records.map(x => ({
   month: String(x['Response Date']).slice(0, 7),
+  date: String(x['Response Date']).slice(0, 10),
   segment: x['Product Segment'], klass: x['NPS Class'], score: x.Score
 }));
 const preferredSegmentOrder = [
@@ -51,7 +52,7 @@ const $=function(id){return document.getElementById(id)};
 const nav=$('segmentNav'),yearFilter=$('yearFilter'),monthFilter=$('monthFilter'),classifierFilter=$('classifierFilter'),categoryFilter=$('categoryFilter'),classFilter=$('classFilter'),trendCategoryFilter=$('trendCategoryFilter'),waterfallStart=$('waterfallStart'),waterfallEnd=$('waterfallEnd'),commentSearch=$('commentSearch'),searchCount=$('searchCount'),searchResults=$('searchResults');
 let activeSegment='Total';
 const MONTHS=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-function monthLabel(m){return MONTHS[Number(m.slice(5,7))-1]+' '+m.slice(0,4)}
+function monthLabel(m){if(m.charAt(0)==='D'){var daily=m.slice(1).split('-');return Number(daily[2])+' '+MONTHS[Number(daily[1])-1]+' '+daily[0].slice(2)}if(m.charAt(0)==='W'){var weekly=m.slice(1).split('-');return 'Sem. '+Number(weekly[2])+' '+MONTHS[Number(weekly[1])-1]}return MONTHS[Number(m.slice(5,7))-1]+' '+m.slice(0,4)}
 function fmt(n){return Number(n||0).toLocaleString('en-US')}
 function activeCategory(x){return x.categoryLocal||x.categoryOllama||x.category||''}
 function calcNps(rows){if(!rows.length)return null;return ((rows.filter(function(x){return x.klass==='Promotor'}).length-rows.filter(function(x){return x.klass==='Detractor'}).length)*100/rows.length)}
@@ -137,6 +138,34 @@ const withChartLegend = withMobileOverview.replace(
   '</body>',
   `<script>(function(){var baseRender=render;render=function(){baseRender();var variation=document.getElementById('npsVariation');if(variation)variation.innerHTML='<span class="nps-legend">Altura: NPS del mes · color: cambio mensual</span><br>'+variation.innerHTML};render()})();</script></body>`,
 );
+const withPeriodGranularity = withChartLegend
+  .replace(
+    '<section class="filterbar">',
+    '<section class="filterbar"><div class="filter"><label for="periodGranularity">Vista de gráficos</label><select id="periodGranularity"><option value="month">Mensual</option><option value="week">Semanal</option><option value="day">Diaria</option></select></div>',
+  )
+  .replace(
+    '<button class="reset" id="resetFilters">Limpiar filtros</button>',
+    '<a class="export-link" href="nps_acumulado_diario.xlsx" download>Exportar Excel acumulado</a><a class="export-link" href="comentarios_categorizados.xlsx" download>Exportar comentarios categorizados</a><button class="reset" id="resetFilters">Limpiar filtros</button>',
+  )
+  .replace('<h2>Muestras por mes</h2>', '<h2 id="sampleChartTitle">Muestras por mes</h2>')
+  .replace('<h2>Evolución mensual del NPS</h2>', '<h2 id="npsChartTitle">Evolución mensual del NPS</h2>')
+  .replace('</body>', `<script>(function(){
+var granularity=$('periodGranularity');if(!granularity)return;
+function isoWeekStart(value){var d=new Date(value+'T00:00:00'),offset=(d.getDay()+6)%7;d.setDate(d.getDate()-offset);return d.toISOString().slice(0,10)}
+function periodKey(row){if(granularity.value==='day')return 'D'+row.date;if(granularity.value==='week')return 'W'+isoWeekStart(row.date);return row.month}
+function periodName(){return granularity.value==='day'?'día':granularity.value==='week'?'semana':'mes'}
+function setPeriodTitles(){var npsTitle=$('npsChartTitle'),sampleTitle=$('sampleChartTitle'),suffix=granularity.value==='day'?'diaria':granularity.value==='week'?'semanal':'mensual';if(npsTitle)npsTitle.textContent='Evolución '+suffix+' del NPS';if(sampleTitle)sampleTitle.textContent='Muestras por '+periodName()}
+function renderPeriodCharts(){var responses=selectedResponses(),groups={};responses.forEach(function(row){var key=periodKey(row);(groups[key]||(groups[key]=[])).push(row)});var periods=Object.keys(groups).sort(),trend={};periods.forEach(function(key){trend[key]=groups[key]});renderBarChart($('sampleChart'),periods,function(key){return trend[key].length},function(value){return fmt(value)},function(){return 'nps-white'},function(key,index,keys,values){if(index===0)return null;var previous=values[index-1];return previous?((values[index]-previous)/previous*100):null},function(value){return (value>=0?'+':'')+value.toFixed(1)+'%'});renderBarChart($('npsChart'),periods,function(key){return calcNps(trend[key])||0},function(value){return value.toFixed(1)},function(){return 'nps-white'},function(key,index,keys,values){if(index===0)return null;return values[index]-values[index-1]},function(value){return (value>=0?'+':'')+value.toFixed(1)+' pts'},true);var delta=periods.length>1?calcNps(trend[periods[periods.length-1]])-calcNps(trend[periods[periods.length-2]]):null;$('npsVariation').innerHTML=delta===null?'Variación: sin período anterior':'Variación vs '+monthLabel(periods[periods.length-2])+' · <b class="'+(delta>=0?'up':'down')+'">'+(delta>=0?'+':'')+delta.toFixed(1)+' pts</b>'}
+var baseRender=render;render=function(){baseRender();setPeriodTitles();if(granularity.value!=='month')renderPeriodCharts()};granularity.addEventListener('change',render);render();
+})();</script></body>`);
+const withAdaptiveNpsAxis = withPeriodGranularity.replace('</body>', `<script>(function(){
+var fixedRenderBarChart=renderBarChart;
+renderBarChart=function(container,periods,getValue,formatValue,colorFn,deltaFn,deltaFormatFn,centerZero){if(!centerZero)return fixedRenderBarChart(container,periods,getValue,formatValue,colorFn,deltaFn,deltaFormatFn,centerZero);container.innerHTML='';container.classList.add('nps-chart');container.classList.remove('sample-chart');if(!periods.length){container.innerHTML='<div class="empty">No hay datos para esta selección.</div>';return}var values=periods.map(getValue),max=Math.max.apply(null,values.map(function(value){return Math.abs(value||0)}).concat([1])),axisMax=Math.max(10,Math.ceil(max/10)*10);var axis=document.createElement('div');axis.className='nps-axis';axis.setAttribute('aria-hidden','true');axis.innerHTML='<span>'+axisMax+'</span><span>'+axisMax/2+'</span><span>0</span><span>−'+axisMax/2+'</span><span>−'+axisMax+'</span>';container.appendChild(axis);var grid=document.createElement('div');grid.className='nps-grid';grid.setAttribute('aria-hidden','true');grid.innerHTML='<i></i><i></i><i class="zero"></i><i></i><i></i>';container.appendChild(grid);periods.forEach(function(period,index){var value=values[index],delta=deltaFn?deltaFn(period,index,periods,values):null,item=document.createElement('div');item.className='bar-item';var track=document.createElement('div');track.className='bar-track nps-track';var bar=document.createElement('div');bar.className='bar '+colorFn(value)+' nps-bar '+(delta===null||delta===undefined?'nps-neutral':delta>=0?'nps-improve':'nps-decline');var height=Math.max(Math.abs(value)/(axisMax*2)*205,3);bar.style.height=height+'px';bar.dataset.value=String(value);bar.style.top=(value>=0?(102.5-height):102.5)+'px';bar.style.bottom='auto';var valueLabel=document.createElement('span');valueLabel.className='bar-value nps-value';valueLabel.textContent=formatValue(value);valueLabel.style.top=(value<0?Math.min(185,102.5+height+6):Math.max(0,102.5-height-21))+'px';track.appendChild(bar);track.appendChild(valueLabel);var label=document.createElement('div');label.className='month-label';label.textContent=monthLabel(period);item.appendChild(track);item.appendChild(label);var deltaLabel=document.createElement('div');deltaLabel.className='bar-delta '+(delta===null||delta===undefined?'placeholder':delta>=0?'up':'down');deltaLabel.textContent=delta===null||delta===undefined?' ':'Δ '+deltaFormatFn(delta);item.appendChild(deltaLabel);container.appendChild(item)})};render();
+})();</script></body>`);
+const withNpsValueMargin = withAdaptiveNpsAxis.replace('</body>', `<script>(function(){
+function placeNpsValues(){document.querySelectorAll('.nps-chart .bar-track').forEach(function(track){var bar=track.querySelector('.nps-bar'),value=track.querySelector('.nps-value');if(!bar||!value)return;var margin=9,positive=Number(bar.dataset.value)>=0;value.style.top=(positive?bar.offsetTop-value.offsetHeight-margin:bar.offsetTop+bar.offsetHeight+margin)+'px'})}
+var baseRender=render;render=function(){baseRender();placeNpsValues()};render();
+})();</script></body>`);
 const mobileResponsiveCss = `
 @keyframes dashboard-fade-up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes dashboard-bar-in{from{opacity:0;clip-path:inset(100% 0 0)}to{opacity:1;clip-path:inset(0)}}
@@ -154,7 +183,7 @@ const mobileResponsiveCss = `
 .sample-grid{position:absolute;left:38px;right:8px;top:34px;height:205px;pointer-events:none}.sample-grid i{position:absolute;left:0;right:0;top:0;border-top:1px solid rgba(170,162,156,.2)}.sample-grid i:nth-child(2){top:50%}.sample-grid i:last-child{top:100%;border-top-color:rgba(170,162,156,.5)}
 .bar.sample-bar.nps-white{width:25px;border-radius:3px;background:repeating-linear-gradient(to top,#f8f5f2 0 5px,rgba(248,245,242,.14) 5px 8px);box-shadow:0 0 12px rgba(248,245,242,.12)}
 .sample-value,.nps-value{z-index:4;color:#f8f5f2;text-shadow:0 1px 5px rgba(0,0,0,.8);pointer-events:none}
-.nps-bar{width:25px;border-radius:3px}.nps-bar.nps-improve{background:linear-gradient(180deg,#c9f24a 0%,#8db600 100%);box-shadow:0 0 10px rgba(141,182,0,.3)}.nps-bar.nps-decline{background:linear-gradient(180deg,#ff5a7d 0%,#e00032 100%);box-shadow:0 0 10px rgba(224,0,50,.28)}.nps-bar.nps-neutral{background:linear-gradient(180deg,#d7d1ca 0%,#8f8982 100%);box-shadow:none}
+.nps-bar{width:25px;border-radius:3px}.nps-bar.nps-improve{background:#8db600;box-shadow:none}.nps-bar.nps-decline{background:#e00032;box-shadow:none}.nps-bar.nps-neutral{background:#8f8982;box-shadow:none}
 .nps-legend{color:var(--muted);font-size:9px;letter-spacing:.01em}
 .category-segment{animation:dashboard-fade-up .48s ease-out both;animation-delay:calc(var(--motion-index,0)*24ms)}
 .card,.target-card,.comment,.search-result,.driver,.coverage-stat{animation:dashboard-fade-up .42s ease-out both;animation-delay:calc(var(--motion-index,0)*28ms)}
@@ -172,7 +201,8 @@ const mobileResponsiveCss = `
   .main{padding:8px 8px 28px}.mobile-title-row h1{font-size:24px}.mobile-update{font-size:9px}.mobile-snapshot-card{min-height:88px;padding:12px}.mobile-snapshot-card strong{font-size:23px}.panel{padding:12px}.kvalue{font-size:25px}.target-value{font-size:23px}
   .panel-head{gap:8px}.panel-question{font-size:10px}.top3-chart{grid-template-columns:1fr}.wf-selects{display:grid;grid-template-columns:1fr 1fr}.wf-selects .filter{min-width:0}
 }
+.filterbar{grid-template-columns:repeat(7,minmax(0,1fr))}.export-link{height:38px;margin-top:15px;display:flex;align-items:center;justify-content:center;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:11px;font-weight:700;text-align:center;text-decoration:none}.export-link:hover{border-color:var(--orange);color:var(--orange)}.nps-chart{height:320px}.nps-chart .bar-item{height:281px;grid-template-rows:205px 52px 16px}.nps-chart .month-label{margin-top:28px}@media(max-width:760px){.export-link{width:100%;height:44px;margin-top:0;font-size:14px}}
 `;
-const withMobileResponsive = withChartLegend.replace('</head>', `<style>${mobileResponsiveCss}</style></head>`);
+const withMobileResponsive = withNpsValueMargin.replace('</head>', `<style>${mobileResponsiveCss}</style></head>`);
 await fs.writeFile(output, withMobileResponsive, 'utf8');
 console.log(output, withTnpsGuard.length);
