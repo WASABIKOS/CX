@@ -102,7 +102,8 @@ function alignReferenceLayout(){
   var finalLayoutStyle=document.createElement('style');finalLayoutStyle.textContent='.comments-layout{grid-template-columns:repeat(3,minmax(0,1fr))}.coverage-track{height:18px;background:#302c29;border-radius:9px;overflow:hidden;display:flex;margin:18px 0 14px}.coverage-ok,.coverage-pending{height:100%}.coverage-ok{background:var(--green)}.coverage-pending{background:var(--red)}.coverage-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.coverage-stat{background:var(--surface2);border-radius:9px;padding:14px 12px}.coverage-stat .klabel{display:block}.coverage-stat b{display:block;font-size:27px;margin-top:8px}.coverage-stat .positive{color:var(--green)}.coverage-stat .negative{color:var(--red)}@media(max-width:1100px){.comments-layout{grid-template-columns:1fr}}';document.head.appendChild(finalLayoutStyle);
 }
 function renderCoverage(){var base=FEEDBACK.filter(function(x){return (activeSegment==='Total'||x.segment===activeSegment)&&timeMatches(x)&&(classFilter.value==='all'||x.klass===classFilter.value)}),classified=base.filter(function(x){return Boolean(activeCategory(x))}).length,unclassified=base.length-classified,total=base.length||1,classifiedPct=classified/total*100,unclassifiedPct=unclassified/total*100;$('coverageOk').style.width=classifiedPct+'%';$('coveragePending').style.width=unclassifiedPct+'%';$('coverageClassified').textContent=fmt(classified);$('coverageUnclassified').textContent=fmt(unclassified);$('coverageClassifiedPct').textContent=base.length?classifiedPct.toFixed(1)+'% de la base':'0.0% de la base';$('coverageUnclassifiedPct').textContent=base.length?unclassifiedPct.toFixed(1)+'% de la base':'0.0% de la base';$('coverageNote').textContent=base.length?(unclassified?'Hay feedbacks pendientes de categorizar.':'El modelo local cubre la base completa con comentario.'):'No hay feedback con los filtros seleccionados.'}
-var renderDashboard=render;render=function(){syncActiveSegmentButton();renderDashboard();renderCoverage()};
+function applyMotionIndexes(){document.querySelectorAll('.bar-item,.category-month,.card,.target-card,.comment,.search-result,.driver,.coverage-stat').forEach(function(node,index){node.style.setProperty('--motion-index',Math.min(index,12))})}
+var renderDashboard=render;render=function(){syncActiveSegmentButton();renderDashboard();renderCoverage();applyMotionIndexes()};
 alignReferenceLayout();
 render();
 </script></body></html>`;
@@ -125,6 +126,16 @@ const withTnpsGuard = withFinalCards.replace(
   `<script>(function(){var baseRender=render;function guardTnpsPanels(){var isTnps=String(activeSegment||'').indexOf('tNPS -')===0;var targets=document.getElementById('targetCards'),forecast=document.querySelector('.forecast-panel');if(targets)targets.style.display=isTnps?'none':'';if(forecast)forecast.style.display=isTnps?'none':''}render=function(){baseRender();guardTnpsPanels()};guardTnpsPanels()})();</script></body>`,
 );
 const mobileResponsiveCss = `
+@keyframes dashboard-fade-up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes dashboard-bar-in{from{opacity:0;clip-path:inset(100% 0 0)}to{opacity:1;clip-path:inset(0)}}
+.segment-button,.filter select,.reset,.card,.target-card,.comment,.search-result{transition:background-color .22s ease,border-color .22s ease,box-shadow .22s ease,color .22s ease,transform .22s ease}
+.segment-button:hover,.filter select:hover,.reset:hover{transform:translateY(-1px)}
+.card:hover,.target-card:hover,.comment:hover,.search-result:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(0,0,0,.28)}
+.segment-button:focus-visible,.filter select:focus-visible,.reset:focus-visible,.search-input:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.bar{animation:dashboard-bar-in .55s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--motion-index,0)*28ms)}
+.category-segment{animation:dashboard-fade-up .48s ease-out both;animation-delay:calc(var(--motion-index,0)*24ms)}
+.card,.target-card,.comment,.search-result,.driver,.coverage-stat{animation:dashboard-fade-up .42s ease-out both;animation-delay:calc(var(--motion-index,0)*28ms)}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 @media(max-width:760px){
   .sidebar{position:sticky;top:0;z-index:30;width:100%;height:auto;max-height:none;padding:14px 12px;background:#090909;border-right:0;border-bottom:1px solid var(--border)}
   .subtitle{display:none}.report-update-card{margin:0 0 10px}.eyebrow{margin:10px 0 6px}
