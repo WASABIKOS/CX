@@ -201,7 +201,7 @@ const mobileResponsiveCss = `
   .main{padding:8px 8px 28px}.mobile-title-row h1{font-size:24px}.mobile-update{font-size:9px}.mobile-snapshot-card{min-height:88px;padding:12px}.mobile-snapshot-card strong{font-size:23px}.panel{padding:12px}.kvalue{font-size:25px}.target-value{font-size:23px}
   .panel-head{gap:8px}.panel-question{font-size:10px}.top3-chart{grid-template-columns:1fr}.wf-selects{display:grid;grid-template-columns:1fr 1fr}.wf-selects .filter{min-width:0}
 }
-.filterbar{grid-template-columns:repeat(7,minmax(0,1fr))}.export-link{height:38px;margin-top:15px;display:flex;align-items:center;justify-content:center;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:11px;font-weight:700;text-align:center;text-decoration:none}.export-link:hover{border-color:var(--orange);color:var(--orange)}@media(max-width:760px){.export-link{width:100%;height:44px;margin-top:0;font-size:14px}}
+.filterbar{grid-template-columns:repeat(7,minmax(0,1fr))}.export-link{height:38px;margin-top:15px;display:flex;align-items:center;justify-content:center;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:11px;font-weight:700;text-align:center;text-decoration:none}.export-link:hover{border-color:var(--orange);color:var(--orange)}.nps-chart{height:320px}.nps-chart .bar-item{height:281px;grid-template-rows:205px 52px 16px}.nps-chart .month-label{margin-top:28px}@media(max-width:760px){.export-link{width:100%;height:44px;margin-top:0;font-size:14px}}
 `;
 const withMobileResponsive = withNpsValueMargin.replace('</head>', `<style>${mobileResponsiveCss}</style></head>`);
 await fs.writeFile(output, withMobileResponsive, 'utf8');
