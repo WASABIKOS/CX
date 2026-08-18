@@ -124,5 +124,23 @@ const withTnpsGuard = withFinalCards.replace(
   '</body>',
   `<script>(function(){var baseRender=render;function guardTnpsPanels(){var isTnps=String(activeSegment||'').indexOf('tNPS -')===0;var targets=document.getElementById('targetCards'),forecast=document.querySelector('.forecast-panel');if(targets)targets.style.display=isTnps?'none':'';if(forecast)forecast.style.display=isTnps?'none':''}render=function(){baseRender();guardTnpsPanels()};guardTnpsPanels()})();</script></body>`,
 );
-await fs.writeFile(output, withTnpsGuard, 'utf8');
+const mobileResponsiveCss = `
+@media(max-width:760px){
+  .sidebar{position:sticky;top:0;z-index:30;width:100%;height:auto;max-height:none;padding:14px 12px;background:#090909;border-right:0;border-bottom:1px solid var(--border)}
+  .subtitle{display:none}.report-update-card{margin:0 0 10px}.eyebrow{margin:10px 0 6px}
+  #segmentNav{display:flex;gap:8px;overflow-x:auto;padding:2px 0 7px;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+  .segment-button{flex:0 0 auto;width:auto;min-height:44px;margin:0;padding:11px 14px;white-space:nowrap;touch-action:manipulation}
+  .main{margin-left:0;padding:16px 12px 34px}.header{display:block}.title{font-size:25px}.badge{display:inline-block;margin-top:9px}
+  .filterbar{position:relative;grid-template-columns:1fr;gap:9px;padding:10px 0 12px}.filter select,.reset{height:44px;font-size:14px}.reset{width:100%;margin-top:0}
+  .cards,.target-cards{grid-template-columns:1fr;gap:10px}.two,.executive,.comments-layout{grid-template-columns:1fr;gap:10px}.panel{padding:14px}
+  .bar-chart,.category-trend,.waterfall-chart{overflow-x:auto;-webkit-overflow-scrolling:touch}.bar-item{flex-basis:56px;min-width:56px}.top3-chart{grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px 12px}
+  .distribution{grid-template-columns:1fr;gap:12px}.donut{margin:auto}.comments{grid-template-columns:1fr}.search-results{max-height:none}
+}
+@media(max-width:480px){
+  .main{padding:12px 8px 28px}.title{font-size:22px}.header-meta{font-size:11px}.panel{padding:12px}.kvalue{font-size:25px}.target-value{font-size:23px}
+  .panel-head{gap:8px}.panel-question{font-size:10px}.top3-chart{grid-template-columns:1fr}.wf-selects{display:grid;grid-template-columns:1fr 1fr}.wf-selects .filter{min-width:0}
+}
+`;
+const withMobileResponsive = withTnpsGuard.replace('</head>', `<style>${mobileResponsiveCss}</style></head>`);
+await fs.writeFile(output, withMobileResponsive, 'utf8');
 console.log(output, withTnpsGuard.length);
