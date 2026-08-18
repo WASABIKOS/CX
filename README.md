@@ -6,6 +6,10 @@ clasifica comentarios en drivers CX y conserva el estado incremental de las
 clasificaciones.
 
 Para el uso diario en Windows, consulta [`OPERACION_DIARIA.md`](OPERACION_DIARIA.md).
+Para que un LLM siga las mismas reglas, carga el skill compartido
+`G:\My Drive\CORE\04_SHARED_SKILLS\cx-nps-operacion\SKILL.md` antes de editar
+datos, categorías o dashboards. El repositorio conserva una copia portable en
+[`skills/cx-nps-operacion/SKILL.md`](skills/cx-nps-operacion/SKILL.md).
 
 ## Componentes
 
@@ -15,6 +19,8 @@ Para el uso diario en Windows, consulta [`OPERACION_DIARIA.md`](OPERACION_DIARIA
 - `run_cx_nps.bat`: flujo diario de un solo clic en Windows.
 - `run_project.py`: entrada portable que construye el dataset y el dashboard.
 - `outputs/feedback_review.csv`: revisión local de comentarios y categorías.
+- `outputs/comentarios_categorizados.xlsx`: exportación filtrable para revisar
+  comentarios y categorías sin editar el CSV.
 - `work/build_report.mjs`: genera el reporte Excel a partir del dataset
   normalizado local.
 - `work/build_dashboard_html.mjs`: genera el dashboard HTML interactivo.
@@ -48,18 +54,33 @@ En Windows, la operación diaria recomendada es colocar el Excel en `input/` y
 hacer doble clic en `run_cx_nps.bat`. El archivo detecta el Excel más reciente,
 ejecuta todo el proceso y abre el dashboard al terminar.
 
-El programa detecta el Excel, calcula las métricas, clasifica los comentarios
-con la taxonomía local y genera:
+El programa detecta el Excel, calcula las métricas y clasifica los comentarios
+con la taxonomía local. La clasificación automática es incremental: reutiliza
+el resultado cuando coinciden el `CW - Unique ID`, el texto del comentario y
+la versión de la taxonomía. Genera:
 
 - `outputs/cx_nps_dashboard.html`: dashboard actualizado.
 - `outputs/nps_data.json`: dataset local utilizado para construirlo.
 - `outputs/feedback_review.csv`: comentarios en formato editable para revisión
   o recategorización manual.
+- `outputs/comentarios_categorizados.xlsx`: copia en Excel para revisar y
+  filtrar comentarios, categorías y `feedback_key`.
+- `outputs/classification_state.json`: estado local que evita recalcular
+  comentarios sin cambios.
 
 Para recategorizar un comentario, abre `outputs/feedback_review.csv` en Excel,
 edita la columna `category` usando una categoría exacta de `cx_taxonomy.py`,
 guarda el archivo y vuelve a ejecutar `run_cx_nps.bat`. La corrección se
 conservará en el dashboard mientras coincida el `feedback_key`.
+
+También puedes pedirle a tu LLM que edite directamente `category` en
+`outputs/feedback_review.csv`, manteniendo `feedback_key` y usando una categoría
+exacta de `cx_taxonomy.py`. Ejecuta después `run_cx_nps.bat` para aplicar el
+cambio y actualizar el HTML publicado.
+
+La segmentación del reporte separa pNPS en Internet, Mobile Contrato y Mobile
+Prepago. tNPS se desglosa por touchpoint: Pay (Invoice/Full Journey), Buy,
+Install (Full/Self), Change, Exit y Help (CC/Store/Technician, resuelto por `tHelp - Type`).
 
 Para elegir explícitamente un archivo o una carpeta de salida:
 
@@ -69,10 +90,10 @@ python run_project.py `
   --output-dir "outputs"
 ```
 
-`incremental_feedback_classifier.py` permanece disponible para el flujo
-incremental con un modelo joblib local. El flujo recomendado para una carpeta
-clonada es `run_project.py`, que no depende de rutas absolutas ni de un modelo
-externo.
+`incremental_feedback_classifier.py` permanece disponible como flujo separado
+para experimentar con un modelo joblib local. El flujo recomendado para una
+carpeta clonada es `run_project.py`, que usa la taxonomía vigente, conserva el
+estado incremental y no depende de rutas absolutas ni de un modelo externo.
 
 ## Estado del repositorio
 

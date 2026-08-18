@@ -2,6 +2,7 @@
 
 import argparse
 import csv
+import hashlib
 import json
 import subprocess
 import sys
@@ -11,23 +12,76 @@ from pathlib import Path
 
 import openpyxl
 
-from cx_taxonomy import TAXONOMY, categorize
+from cx_taxonomy import TAXONOMY, TAXONOMY_VERSION, categorize
+from categorized_comments_export import write_categorized_comments_workbook
+from daily_nps_export import write_daily_cumulative_workbook
 
 
-COMMENT_COLUMNS = [
+SPANISH_MONTHS = (
+    "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+    "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
+)
+
+
+def report_timestamp():
+    now = datetime.now()
+    return f"{now.day:02d} {SPANISH_MONTHS[now.month - 1]} {now.year} · {now:%H:%M}"
+
+
+BASE_COMMENT_COLUMNS = [
     "rNPS - Overall Satisfaction comment",
     "Internet Additional Comments",
     "Phone Mobile Catchall Comment",
 ]
-NEEDED_COLUMNS = [
+TNPS_SCORE_COLUMNS = [
+    "Buy - Likelihood to Recommend",
+    "Full Install - Likelihood to Recommend",
+    "Self Install - Likelihood to Recommend",
+    "Pay Invoice - Likelihood to Recommend",
+    "Pay Full Journey - Likelihood to Recommend",
+    "Help - CC Likelihood to Recommend",
+    "Help - Store Likelihood to Recommend",
+    "Help - Likelihood to Recommend",
+    "Help Technician - Likelihood to Recommend",
+    "Help Technician - Likelihood To Recommend",
+    "Change - Likelihood to Recommend",
+    "Exit - Likeliness to Rejoin",
+]
+TNPS_COMMENT_COLUMNS = [
+    "Buy - Likelihood to Recommend Comment", "Buy - Catch All Comment", "Buy - Catchall Comment AB",
+    "Full Install - Likelihood to Recommend Comment", "Full Install - Problem Comment",
+    "Full Install - Catch All Comment", "Full Install - Catchall Comment AB",
+    "Self Install - Likelihood to Recommend Comment", "Self Install - Problem Comment",
+    "Self Install - Catch All Comment", "Self Install - Satisfaction Comment",
+    "Pay Invoice - Likelihood to Recommend Comment", "Pay Invoice - Catch All Comment",
+    "Pay Full Journey - Likelihood to Recommend Comment", "Pay Full Journey - Catch All Comment",
+    "Help - Likelihood to Recommend  Comment", "Help - Catch All Comment",
+    "Help Technician - Likelihood To Recommend Comment", "Help Technician - Catch All Comment",
+    "Help Technician - Catchall Comment AB", "Change - Likelihood to Recommend Comment",
+    "Change - Catch All Comment",
+    "Exit - Likeliness to Rejoin Comment", "Exit - Cancellation Reason", "Exit - Company Switch",
+    "Exit - Reason to Stay", "Exit - Agent Understanding", "Exit - Agent Friendliness",
+    "Exit - Catch All Comment", "CWP Exit - Cancellation Reason", "CWP Exit - Cancellation Reason - Other",
+    "CWP Exit - Company Switch", "CWP Exit - Company Switch (Other)",
+]
+COMMENT_COLUMNS = [*BASE_COMMENT_COLUMNS, *TNPS_COMMENT_COLUMNS]
+BASE_NEEDED_COLUMNS = [
     "CW - Unique ID", "Unit", "Survey Type", "Plan Type", "Broadband RGU",
     "Customer Response Date (EST)", "Probabilidad de Recomendar",
     "Internet - Likelihood to Recommend", "Mobile - Likelihood to Recommend",
-    *COMMENT_COLUMNS, "NPS Segments - pNPS Internet", "NPS Segments - pNPS Mobile",
-    "NPS Segments - rNPS/tNPS",
+    *BASE_COMMENT_COLUMNS, "NPS Segments - pNPS Internet", "NPS Segments - pNPS Mobile",
 ]
+OPTIONAL_TNPS_COLUMNS = [
+    "tNPS Touchpoint", "tHelp - Type", "tExit - Type", *TNPS_SCORE_COLUMNS,
+    *TNPS_COMMENT_COLUMNS, "NPS Segments - rNPS/tNPS",
+]
+NEEDED_COLUMNS = [*BASE_NEEDED_COLUMNS, *OPTIONAL_TNPS_COLUMNS]
 SEGMENT_ORDER = [
-    "pNPS Internet", "pNPS Mobile - Contrato", "pNPS Mobile - Prepago", "rNPS / Relación",
+    "pNPS Internet", "pNPS Mobile - Contrato", "pNPS Mobile - Prepago",
+    "tNPS - Pay - Invoice", "tNPS - Pay - Full Journey", "tNPS - Buy",
+    "tNPS - Install - Full Install", "tNPS - Install - Self Install",
+    "tNPS - Change", "tNPS - Exit", "tNPS - Help - CC", "tNPS - Help - Store",
+    "tNPS - Help - General", "tNPS - Help - Technician", "rNPS / Relación",
 ]
 MAPPING = [
     ["Fuente", "Campo / regla", "Uso en reporte"],
@@ -36,6 +90,11 @@ MAPPING = [
     ["pNPS Internet", "Survey Type = pNPS + Plan Type = Servicio residencial + Broadband RGU > 0 → Internet - Likelihood to Recommend", "Score 0–10 para pNPS Internet"],
     ["pNPS Mobile contrato", "Survey Type = pNPS + Plan Type contiene Contrato → Mobile - Likelihood to Recommend", "Score 0–10 para pNPS Mobile contrato"],
     ["pNPS Mobile prepago", "Survey Type = pNPS + Plan Type contiene Prepago → Mobile - Likelihood to Recommend", "Score 0–10 para pNPS Mobile prepago"],
+    ["tNPS Pay", "tNPS Touchpoint = Pay → Pay Invoice / Pay Full Journey - Likelihood to Recommend", "Score 0–10 por subtipo Pay"],
+    ["tNPS Buy", "tNPS Touchpoint = Buy → Buy - Likelihood to Recommend", "Score 0–10 para tNPS Buy"],
+    ["tNPS Install", "tNPS Touchpoint = Install → Full Install / Self Install - Likelihood to Recommend", "Score 0–10 por subtipo Install"],
+    ["tNPS Change", "tNPS Touchpoint = Change → Change - Likelihood to Recommend", "Score 0–10 para tNPS Change"],
+    ["tNPS Help", "tNPS Touchpoint = Help → CC / Store / General / Technician - Likelihood to Recommend", "Score 0–10 por subtipo Help"],
     ["Clasificación", "9–10 Promotor; 7–8 Neutro; 0–6 Detractor", "Base estándar NPS"],
     ["NPS", "(% Promotores - % Detractores) × 100", "Calculado por segmento y mes"],
 ]
@@ -68,8 +127,79 @@ def classify_score(score):
     return "Promotor" if score >= 9 else "Neutro" if score >= 7 else "Detractor"
 
 
-def product_and_score(get, survey_type, plan_type, broadband):
-    survey = survey_type.lower()
+def normalized_label(value):
+    return " ".join(str(value or "").lower().replace("-", " ").split())
+
+
+def first_tnps_score(get, candidates):
+    for segment, field in candidates:
+        score = get(field)
+        if as_float(score) is not None:
+            return segment, score, field
+    return None
+
+
+def tnps_product_and_score(get, touchpoint, help_type):
+    value = normalized_label(touchpoint)
+    if not value:
+        return None
+    if "pay" in value:
+        if "invoice" in value:
+            candidates = [("tNPS - Pay - Invoice", "Pay Invoice - Likelihood to Recommend")]
+        elif "full journey" in value or "journey" in value:
+            candidates = [("tNPS - Pay - Full Journey", "Pay Full Journey - Likelihood to Recommend")]
+        else:
+            candidates = [
+                ("tNPS - Pay - Invoice", "Pay Invoice - Likelihood to Recommend"),
+                ("tNPS - Pay - Full Journey", "Pay Full Journey - Likelihood to Recommend"),
+            ]
+        return first_tnps_score(get, candidates)
+    if "buy" in value:
+        return first_tnps_score(get, [("tNPS - Buy", "Buy - Likelihood to Recommend")])
+    if "install" in value:
+        if "self" in value:
+            candidates = [("tNPS - Install - Self Install", "Self Install - Likelihood to Recommend")]
+        elif "full" in value:
+            candidates = [("tNPS - Install - Full Install", "Full Install - Likelihood to Recommend")]
+        else:
+            candidates = [
+                ("tNPS - Install - Full Install", "Full Install - Likelihood to Recommend"),
+                ("tNPS - Install - Self Install", "Self Install - Likelihood to Recommend"),
+            ]
+        return first_tnps_score(get, candidates)
+    if "change" in value:
+        return first_tnps_score(get, [("tNPS - Change", "Change - Likelihood to Recommend")])
+    if "exit" in value:
+        return first_tnps_score(get, [("tNPS - Exit", "Exit - Likeliness to Rejoin")])
+    if "help" in value:
+        help_value = normalized_label(help_type)
+        if "technician" in value or "tecnico" in value or "technician" in help_value or "truckroll" in help_value:
+            candidates = [
+                ("tNPS - Help - Technician", "Help Technician - Likelihood to Recommend"),
+                ("tNPS - Help - Technician", "Help Technician - Likelihood To Recommend"),
+            ]
+        elif "store" in help_value or "tienda" in help_value:
+            candidates = [("tNPS - Help - Store", "Help - Store Likelihood to Recommend")]
+        elif "cc" in help_value or "call center" in help_value:
+            candidates = [("tNPS - Help - CC", "Help - CC Likelihood to Recommend")]
+        else:
+            candidates = [
+                ("tNPS - Help - CC", "Help - CC Likelihood to Recommend"),
+                ("tNPS - Help - Store", "Help - Store Likelihood to Recommend"),
+                ("tNPS - Help - General", "Help - Likelihood to Recommend"),
+                ("tNPS - Help - Technician", "Help Technician - Likelihood to Recommend"),
+                ("tNPS - Help - Technician", "Help Technician - Likelihood To Recommend"),
+            ]
+        return first_tnps_score(get, candidates)
+    return None
+
+
+def product_and_score(get, survey_type, plan_type, broadband, tnps_touchpoint, help_type):
+    survey = normalized_label(survey_type)
+    if survey == "tnps":
+        tnps = tnps_product_and_score(get, tnps_touchpoint, help_type)
+        if tnps:
+            return tnps
     plan = plan_type.lower()
     if survey == "rnps":
         return "rNPS / Relación", get("Probabilidad de Recomendar"), "Probabilidad de Recomendar"
@@ -93,6 +223,40 @@ def discover_input(root):
     return unique[0]
 
 
+def comment_hash(comment):
+    return hashlib.sha256(comment.encode("utf-8")).hexdigest()
+
+
+def load_classification_state(state_path):
+    if not state_path.exists():
+        return {}
+    try:
+        payload = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if payload.get("version") != TAXONOMY_VERSION:
+        return {}
+    records = payload.get("records", {})
+    return records if isinstance(records, dict) else {}
+
+
+def write_classification_state(state_path, feedback_rows, previous_state=None):
+    records = dict(previous_state or {})
+    timestamp = datetime.now().isoformat(timespec="seconds")
+    for row in feedback_rows:
+        records[row["feedback_key"]] = {
+            "comment_hash": row["comment_hash"],
+            "category_auto": row["category_auto"],
+            "category": row["category"],
+            "category_source": row["category_source"],
+            "updated_at": timestamp,
+        }
+    state_path.write_text(
+        json.dumps({"version": TAXONOMY_VERSION, "records": records}, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
+
+
 def load_manual_overrides(review_path):
     if not review_path.exists():
         return {}
@@ -102,20 +266,28 @@ def load_manual_overrides(review_path):
             key = (row.get("feedback_key") or "").strip()
             category = (row.get("category") or "").strip()
             if key and category in TAXONOMY:
-                overrides[key] = category
+                source = (row.get("category_source") or "").strip()
+                legacy_manual = category != (row.get("category_auto") or "").strip()
+                explicit_source = source if source not in ("", "auto") else ""
+                if explicit_source or legacy_manual:
+                    overrides[key] = {"category": category, "source": explicit_source or "manual"}
     return overrides
 
 
 def write_review_csv(review_path, feedback_rows):
-    fields = ["feedback_key", "month", "segment", "nps_class", "score", "category_auto", "category", "feedback"]
+    fields = [
+        "feedback_key", "month", "segment", "nps_class", "score", "category_auto",
+        "category", "category_source", "feedback",
+    ]
     with review_path.open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
         writer.writerows({field: row.get(field, "") for field in fields} for row in feedback_rows)
 
 
-def build_dataset(input_path, manual_overrides=None):
+def build_dataset(input_path, manual_overrides=None, classification_state=None):
     manual_overrides = manual_overrides or {}
+    classification_state = classification_state or {}
     workbook = openpyxl.load_workbook(input_path, read_only=True, data_only=True)
     sheet = workbook[workbook.sheetnames[0]]
     iterator = sheet.iter_rows(values_only=True)
@@ -123,22 +295,29 @@ def build_dataset(input_path, manual_overrides=None):
     next(iterator, None)
     headers = list(next(iterator, ()))
     positions = {name: index for index, name in enumerate(headers) if name}
-    missing = [name for name in NEEDED_COLUMNS if name not in positions]
+    missing = [name for name in BASE_NEEDED_COLUMNS if name not in positions]
     if missing:
         raise ValueError(f"Columnas faltantes en el Excel: {missing}")
 
     records, feedback_rows, raw_rows = [], [], 0
+    auto_reused = auto_recalculated = manual_applied = cached_manual_reused = 0
     for row in iterator:
         raw_rows += 1
 
         def get(name):
-            return text(row[positions[name]])
+            position = positions.get(name)
+            return text(row[position]) if position is not None else ""
 
         unique_id = get("CW - Unique ID")
         if not unique_id:
             continue
         survey_type, plan_type, broadband = get("Survey Type"), get("Plan Type"), get("Broadband RGU")
-        segment, score_raw, score_basis = product_and_score(get, survey_type, plan_type, broadband)
+        tnps_touchpoint = get("tNPS Touchpoint")
+        help_type = get("tHelp - Type")
+        exit_type = get("tExit - Type")
+        segment, score_raw, score_basis = product_and_score(
+            get, survey_type, plan_type, broadband, tnps_touchpoint, help_type,
+        )
         score = as_float(score_raw)
         if score is None or not 0 <= score <= 10:
             continue
@@ -155,17 +334,42 @@ def build_dataset(input_path, manual_overrides=None):
             "NPS Segments - pNPS Internet": get("NPS Segments - pNPS Internet"),
             "NPS Segments - pNPS Mobile": get("NPS Segments - pNPS Mobile"),
             "NPS Segments - rNPS/tNPS": get("NPS Segments - rNPS/tNPS"),
+            "tNPS Touchpoint": tnps_touchpoint, "tHelp - Type": help_type, "tExit - Type": exit_type,
             "Score": score, "Score Basis": score_basis, "Product Segment": segment,
             "NPS Class": nps_class, "Response Date": response_date,
         }
         records.append(record)
         comment = " | ".join(get(column) for column in COMMENT_COLUMNS if get(column))
         if comment:
-            category_auto = categorize(comment, segment)
-            category = manual_overrides.get(unique_id, category_auto)
+            current_hash = comment_hash(comment)
+            cached = classification_state.get(unique_id, {})
+            cache_valid = (
+                cached.get("comment_hash") == current_hash
+                and cached.get("category_auto") in TAXONOMY
+            )
+            if cache_valid:
+                category_auto = cached["category_auto"]
+                auto_reused += 1
+            else:
+                category_auto = categorize(comment, segment)
+                auto_recalculated += 1
+
+            override = manual_overrides.get(unique_id)
+            if override:
+                category = override["category"]
+                category_source = override["source"]
+                manual_applied += 1
+            elif cache_valid and cached.get("category_source") not in (None, "", "auto") and cached.get("category") in TAXONOMY:
+                category = cached["category"]
+                category_source = cached["category_source"]
+                cached_manual_reused += 1
+            else:
+                category = category_auto
+                category_source = "auto"
             feedback_rows.append({
                 "feedback_key": unique_id, "month": response_date[:7], "segment": segment,
                 "nps_class": nps_class, "category_auto": category_auto, "category": category,
+                "category_source": category_source, "comment_hash": current_hash,
                 "score": score, "feedback": comment,
                 "category_local": category, "category_ollama": None,
             })
@@ -198,11 +402,18 @@ def build_dataset(input_path, manual_overrides=None):
         "headers": headers, "needed": NEEDED_COLUMNS, "records": records, "summary": summary,
         "monthly": monthly, "sample": records[:10], "mapping": MAPPING,
         "source_file": str(input_path), "raw_rows": raw_rows,
+        "report_updated_at": report_timestamp(),
         "feedback_model": {
-            "model": "cx_drivers_v1_manual", "feedback_with_text": len(feedback_rows),
+            "model": "cx_drivers_v1_incremental_rules", "feedback_with_text": len(feedback_rows),
             "categories": categories, "rows": feedback_rows, "ollama": None,
-            "taxonomy": TAXONOMY, "classifier": "cx_drivers_v1_manual",
-            "classification_note": "Taxonomía CX determinística y reproducible; no requiere Ollama ni un modelo externo.",
+            "taxonomy": TAXONOMY, "classifier": TAXONOMY_VERSION,
+            "classification_note": "Clasificación local incremental: reutiliza comentarios sin cambios y conserva recategorizaciones editadas en feedback_review.csv.",
+            "classification_stats": {
+                "auto_reused": auto_reused,
+                "auto_recalculated": auto_recalculated,
+                "manual_or_external_applied": manual_applied,
+                "cached_manual_or_external_reused": cached_manual_reused,
+            },
         },
     }
 
@@ -221,12 +432,19 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
     data_path, dashboard_path = output_dir / "nps_data.json", output_dir / "cx_nps_dashboard.html"
     review_path = output_dir / "feedback_review.csv"
-    data = build_dataset(input_path, load_manual_overrides(review_path))
+    state_path = output_dir / "classification_state.json"
+    daily_export_path = output_dir / "nps_acumulado_diario.xlsx"
+    comments_export_path = output_dir / "comentarios_categorizados.xlsx"
+    state = load_classification_state(state_path)
+    data = build_dataset(input_path, load_manual_overrides(review_path), state)
     data_path.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     write_review_csv(review_path, data["feedback_model"]["rows"])
+    export_summary = write_daily_cumulative_workbook(data["records"], daily_export_path)
+    comments_export_summary = write_categorized_comments_workbook(data["feedback_model"]["rows"], comments_export_path)
     build_script = root / "work" / "build_dashboard_clean.mjs"
     subprocess.run([args.node, str(build_script), str(data_path), str(dashboard_path)], cwd=root, check=True)
-    print(json.dumps({"input": str(input_path), "raw_rows": data["raw_rows"], "valid_responses": len(data["records"]), "feedback_with_text": data["feedback_model"]["feedback_with_text"], "dashboard": str(dashboard_path), "data": str(data_path), "review": str(review_path)}, ensure_ascii=False, indent=2))
+    write_classification_state(state_path, data["feedback_model"]["rows"], state)
+    print(json.dumps({"input": str(input_path), "raw_rows": data["raw_rows"], "valid_responses": len(data["records"]), "feedback_with_text": data["feedback_model"]["feedback_with_text"], "classification_stats": data["feedback_model"]["classification_stats"], "dashboard": str(dashboard_path), "daily_export": str(daily_export_path), "daily_export_summary": export_summary, "comments_export": str(comments_export_path), "comments_export_summary": comments_export_summary, "data": str(data_path), "review": str(review_path), "state": str(state_path)}, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
