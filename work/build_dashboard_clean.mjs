@@ -145,7 +145,7 @@ const withPeriodGranularity = withChartLegend
   )
   .replace(
     '<button class="reset" id="resetFilters">Limpiar filtros</button>',
-    '<a class="export-link" href="nps_acumulado_diario.xlsx" download>Exportar Excel acumulado</a><button class="reset" id="resetFilters">Limpiar filtros</button>',
+    '<a class="export-link" href="nps_acumulado_diario.xlsx" download>Exportar Excel acumulado</a><a class="export-link" href="comentarios_categorizados.xlsx" download>Exportar comentarios categorizados</a><button class="reset" id="resetFilters">Limpiar filtros</button>',
   )
   .replace('<h2>Muestras por mes</h2>', '<h2 id="sampleChartTitle">Muestras por mes</h2>')
   .replace('<h2>Evolución mensual del NPS</h2>', '<h2 id="npsChartTitle">Evolución mensual del NPS</h2>')

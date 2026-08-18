@@ -19,6 +19,8 @@ datos, categorías o dashboards. El repositorio conserva una copia portable en
 - `run_cx_nps.bat`: flujo diario de un solo clic en Windows.
 - `run_project.py`: entrada portable que construye el dataset y el dashboard.
 - `outputs/feedback_review.csv`: revisión local de comentarios y categorías.
+- `outputs/comentarios_categorizados.xlsx`: exportación filtrable para revisar
+  comentarios y categorías sin editar el CSV.
 - `work/build_report.mjs`: genera el reporte Excel a partir del dataset
   normalizado local.
 - `work/build_dashboard_html.mjs`: genera el dashboard HTML interactivo.
@@ -61,6 +63,8 @@ la versión de la taxonomía. Genera:
 - `outputs/nps_data.json`: dataset local utilizado para construirlo.
 - `outputs/feedback_review.csv`: comentarios en formato editable para revisión
   o recategorización manual.
+- `outputs/comentarios_categorizados.xlsx`: copia en Excel para revisar y
+  filtrar comentarios, categorías y `feedback_key`.
 - `outputs/classification_state.json`: estado local que evita recalcular
   comentarios sin cambios.
 
