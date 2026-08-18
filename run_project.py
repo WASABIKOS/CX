@@ -13,6 +13,7 @@ from pathlib import Path
 import openpyxl
 
 from cx_taxonomy import TAXONOMY, TAXONOMY_VERSION, categorize
+from daily_nps_export import write_daily_cumulative_workbook
 
 
 SPANISH_MONTHS = (
@@ -431,14 +432,16 @@ def main():
     data_path, dashboard_path = output_dir / "nps_data.json", output_dir / "cx_nps_dashboard.html"
     review_path = output_dir / "feedback_review.csv"
     state_path = output_dir / "classification_state.json"
+    daily_export_path = output_dir / "nps_acumulado_diario.xlsx"
     state = load_classification_state(state_path)
     data = build_dataset(input_path, load_manual_overrides(review_path), state)
     data_path.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     write_review_csv(review_path, data["feedback_model"]["rows"])
+    export_summary = write_daily_cumulative_workbook(data["records"], daily_export_path)
     build_script = root / "work" / "build_dashboard_clean.mjs"
     subprocess.run([args.node, str(build_script), str(data_path), str(dashboard_path)], cwd=root, check=True)
     write_classification_state(state_path, data["feedback_model"]["rows"], state)
-    print(json.dumps({"input": str(input_path), "raw_rows": data["raw_rows"], "valid_responses": len(data["records"]), "feedback_with_text": data["feedback_model"]["feedback_with_text"], "classification_stats": data["feedback_model"]["classification_stats"], "dashboard": str(dashboard_path), "data": str(data_path), "review": str(review_path), "state": str(state_path)}, ensure_ascii=False, indent=2))
+    print(json.dumps({"input": str(input_path), "raw_rows": data["raw_rows"], "valid_responses": len(data["records"]), "feedback_with_text": data["feedback_model"]["feedback_with_text"], "classification_stats": data["feedback_model"]["classification_stats"], "dashboard": str(dashboard_path), "daily_export": str(daily_export_path), "daily_export_summary": export_summary, "data": str(data_path), "review": str(review_path), "state": str(state_path)}, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

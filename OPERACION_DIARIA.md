@@ -36,9 +36,22 @@ En el primer uso, `run_cx_nps.bat` crea `.venv` e instala las dependencias de
 | `outputs/feedback_review.csv` | Comentarios y categorías para revisión manual. |
 | `outputs/classification_state.json` | Estado incremental por `feedback_key` y hash del comentario. |
 | `outputs/nps_data.json` | Dataset local usado para construir el dashboard. |
+| `outputs/nps_acumulado_diario.xlsx` | Excel operativo por día: una hoja por mes, con bloques Fijo, Contrato y Prepago. El mes más reciente aparece primero. |
 | `cx_taxonomy.py` | Categorías válidas y reglas de clasificación local. |
 
 Los archivos de `input/` y `outputs/` son locales y están excluidos de GitHub.
+
+## Excel acumulado diario
+
+Cada ejecución normal también genera `outputs/nps_acumulado_diario.xlsx` y lo
+copia junto al HTML publicado. El libro toma las fechas y resultados del CWP:
+
+- cada hoja corresponde a un mes, con el más reciente primero;
+- incluye bloques separados para Fijo, Contrato y Prepago;
+- por día muestra muestras, promotores, neutrales, detractores, NPS diario y
+  acumulados calculados en el propio Excel;
+- el HTML ofrece **Exportar Excel acumulado** para abrir o descargar la copia
+  que corresponde al reporte publicado.
 
 ## Recategorización manual
 
