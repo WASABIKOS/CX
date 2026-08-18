@@ -8,6 +8,7 @@ set "OUTPUT_DIR=%ROOT%outputs"
 rem Copia estable que consumen los usuarios del reporte publicado.
 set "PUBLISHED_DIR=%OUTPUT_DIR%\medallia_cx_nps_2026-08-14"
 set "PUBLISHED_DASHBOARD=%PUBLISHED_DIR%\medallia_cx_nps_dashboard.html"
+set "PUBLISHED_DAILY_EXPORT=%PUBLISHED_DIR%\nps_acumulado_diario.xlsx"
 set "INPUT_NAME="
 
 if not exist "%INPUT_DIR%" mkdir "%INPUT_DIR%"
@@ -87,10 +88,20 @@ if errorlevel 1 (
   exit /b 6
 )
 
+copy /Y "%OUTPUT_DIR%\nps_acumulado_diario.xlsx" "%PUBLISHED_DAILY_EXPORT%" >nul
+if errorlevel 1 (
+  echo.
+  echo No pude actualizar el Excel acumulado publicado.
+  pause
+  exit /b 7
+)
+
 echo.
 echo Proceso completado.
 echo Dashboard de trabajo: %OUTPUT_DIR%\cx_nps_dashboard.html
 echo Dashboard publicado: %PUBLISHED_DASHBOARD%
+echo Excel acumulado: %OUTPUT_DIR%\nps_acumulado_diario.xlsx
+echo Excel acumulado publicado: %PUBLISHED_DAILY_EXPORT%
 echo Comentarios para leer o recategorizar: %OUTPUT_DIR%\feedback_review.csv
 echo Estado incremental de categorias: %OUTPUT_DIR%\classification_state.json
 echo Dataset local: %OUTPUT_DIR%\nps_data.json
