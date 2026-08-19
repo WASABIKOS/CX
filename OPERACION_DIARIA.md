@@ -6,8 +6,14 @@ el export de encuestas, ejecutar un archivo y revisar el dashboard actualizado.
 ## Ruta rápida
 
 1. Coloca el Excel cuyo nombre empieza por `CWP` en `input/`.
-2. Haz doble clic en [`run_cx_nps.bat`](run_cx_nps.bat).
-3. Abre `outputs/cx_nps_dashboard.html`; el archivo se abre automáticamente al terminar.
+2. Para actualizar SAMI, coloca también el export `SAMI*.xlsx` o
+   `Detalle de Análisis Conversaciones de IA*.xlsx` en `input/`.
+3. Haz doble clic en [`run_cx_nps.bat`](run_cx_nps.bat).
+4. Abre `outputs/cx_nps_dashboard.html`; el archivo se abre automáticamente al terminar.
+
+El `.bat` conserva el dashboard de trabajo y copia la versión lista para usuarios en
+`outputs/medallia_cx_nps_2026-08-14/medallia_cx_nps_dashboard.html`. Esa es la ruta
+publicada que debe revisarse o refrescarse después de cada actualización.
 
 El `.bat` toma el Excel CWP más reciente de `input/`. No es necesario abrir
 Python, Node.js ni los scripts internos durante la operación diaria.
@@ -27,8 +33,11 @@ En el primer uso, `run_cx_nps.bat` crea `.venv` e instala las dependencias de
 | Ubicación | Uso |
 |---|---|
 | `input/CWP*.xlsx` | Export actual de encuestas Medallia/CWP. |
+| `input/SAMI*.xlsx` | Export opcional de conversaciones SAMI. También se acepta el nombre original `Detalle de Análisis Conversaciones de IA*.xlsx`. |
 | `outputs/cx_nps_dashboard.html` | Dashboard HTML actualizado y navegable. |
+| `outputs/medallia_cx_nps_2026-08-14/medallia_cx_nps_dashboard.html` | Copia publicada que consumen los usuarios. |
 | `outputs/feedback_review.csv` | Comentarios y categorías para revisión manual. |
+| `outputs/classification_state.json` | Estado incremental por `feedback_key` y hash del comentario. |
 | `outputs/nps_data.json` | Dataset local usado para construir el dashboard. |
 | `cx_taxonomy.py` | Categorías válidas y reglas de clasificación local. |
 
@@ -48,6 +57,48 @@ El proceso conserva la categoría manual usando `feedback_key`. Los comentarios
 nuevos se clasifican automáticamente y las correcciones existentes se vuelven
 a aplicar cuando el mismo feedback siga presente.
 
+El archivo `feedback_review.csv` también puede ser editado por un LLM local o
+por otra herramienta automatizada. Debe modificar únicamente `category`, usar
+una categoría exacta de `cx_taxonomy.py` y conservar `feedback_key`. Después se
+ejecuta `run_cx_nps.bat`; el cambio queda guardado y se refleja en el HTML de
+trabajo y en la copia publicada para usuarios.
+
+El proceso no vuelve a ejecutar la clasificación automática para comentarios
+que ya tienen el mismo `feedback_key`, el mismo texto y la misma versión de la
+taxonomía. Si el comentario cambia, si aparece uno nuevo o si cambia la
+taxonomía, se recalcula automáticamente.
+
+La navegación del dashboard separa pNPS en Internet, Mobile Contrato y Mobile
+Prepago. tNPS se separa por touchpoint y subtipo: Pay (Invoice/Full Journey),
+Buy, Install (Full/Self), Change, Exit y Help (CC/Store/Technician, resuelto por `tHelp - Type`).
+
+## Indicadores SAMI
+
+Cuando el BAT encuentra un Excel SAMI, añade `SAMI` debajo de
+`rNPS / Relación`. Mientras se termina de construir la sección, aparece un
+aviso cerrable: `En proceso — Estamos construyendo algo por aquí`. Se aplican
+estas reglas:
+
+- NPS: porcentaje de promotores menos porcentaje de detractores, usando solo
+  `ACEPTO ENCUESTA = ACEPTO` con `PUNTUACION` válida entre 0 y 10.
+- Contención: no derivados dividido entre registros con `DERIVADO` informado.
+- Derivación: derivados dividido entre registros con `DERIVADO` informado.
+- Clientes únicos: teléfonos distintos dentro del periodo seleccionado.
+- Recontacto: `(interacciones - clientes únicos) / interacciones`.
+- Los registros sin fecha se excluyen de tendencias y se informan en la nota de
+  calidad. Los meses incompletos se muestran como parciales.
+
+La vista SAMI presenta primero sus tarjetas de resumen, seguidas por NPS,
+Contención y Recontacto con barras verticales mensuales del total. Debajo
+compara los mismos indicadores por segmento: el eje X es el mes, el eje Y es
+el valor y cada color representa un segmento. Los gráficos se muestran uno
+debajo del otro para usar el ancho completo. Cada gráfico informa máximo,
+mínimo y la tendencia mensual del total.
+
+El pipeline procesa el Excel progresivamente y guarda únicamente agregados.
+No incorpora teléfonos, cuentas, identificadores ni comentarios SAMI al JSON o
+al dashboard.
+
 ## Si hay más de un Excel
 
 El `.bat` procesa automáticamente el archivo CWP con fecha de modificación más
@@ -56,6 +107,7 @@ reciente. Para elegir otro archivo de forma explícita:
 ```powershell
 python run_project.py `
   --input "input\CWP_encuestas_2026-08-15.xlsx" `
+  --sami-input "input\SAMI_conversaciones_2026-08-19.xlsx" `
   --output-dir "outputs"
 ```
 
